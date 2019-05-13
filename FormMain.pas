@@ -61,6 +61,7 @@ type
      procedure rule1D(x, y, leftCellValue, middleCellValue, rightCellValue, trueOrFalse: Integer);
      procedure rule2D;
      function IntToBinLowByte(Value: LongWord): string;
+     function modulo(x, m: Integer): Integer;
     private
      {}
     end;
@@ -360,6 +361,8 @@ begin
   drawGrid;
 end;
 
+
+
 {
 TRules
 }
@@ -414,19 +417,25 @@ procedure TRules.rule1D(x, y, leftCellValue, middleCellValue, rightCellValue, tr
     end;
   end;
 
+function TRules.modulo(x,m: Integer): Integer;
+begin
+   Result := (x mod m + m) mod m;
+end;
+
 procedure TRules.rule2D;
 var nextGridArray: TGridArray;
   X, Y, I, J, neighbours: Integer;
  begin
   SetLength(nextGridArray, maxWidth, maxTime);
   // starting from 1s and subsiding 2 to dont care about boundary conditions
-  for X := 1 to maxWidth - 2 do begin
-    for Y := 1 to maxTime - 2 do begin
+  for X := 0 to maxWidth - 1 do begin
+    for Y := 0 to maxTime - 1 do begin
     neighbours := 0;
       //small loops to check neighbourhood of choosen cell
       for I := - 1 to 1 do begin
         for J := -1 to 1 do begin
-           neighbours := neighbours + gridArray[X + I][Y + J];
+
+           neighbours := neighbours + gridArray[modulo(X+I, maxWidth)][modulo(Y + J, maxTime)];
         end;
       end;
 

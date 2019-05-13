@@ -42,8 +42,6 @@ object frmMain: TfrmMain
     Color = clActiveCaption
     ParentBackground = False
     TabOrder = 0
-    ExplicitLeft = 903
-    ExplicitTop = 24
     object lblRegula: TLabel
       Left = 6
       Top = 112
