@@ -29,7 +29,8 @@ type
     procedure FormCreate(Sender: TObject);
     procedure btnDrawClick(Sender: TObject);
     procedure edtRuleNoChange(Sender: TObject);
-    procedure drawGrid;
+    procedure SetColor;
+    procedure drawColourGrid;
     procedure clearCanvas;
     procedure clearGridArray;
     procedure setCellValue(x, y: Integer);
@@ -47,31 +48,50 @@ type
   public
     { Public declarations }
   end;
-type
-  TGridArray = array of array of Integer;
+
+  type
+  TCellObject = class
+    public
+   value: Integer;
+   amount: Integer;
+   constructor Create( val : Integer = 0; amou : Integer = 0);
+  end;
+
+  type
+  TGridArray = array of array of TCellObject;
 var
   frmMain: TfrmMain;
   gridArray: TGridArray;
   maxWidth, maxTime:Integer;
   bitMap: TBitmap;
+  FColorList : TList<TColor>;
 type
     TRules = class
     public
      procedure ActivateChoosen1DRules(x, y: Integer);
      procedure rule1D(x, y, leftCellValue, middleCellValue, rightCellValue, trueOrFalse: Integer);
      procedure rule2D;
+     procedure ruleVonNeumann;
      function IntToBinLowByte(Value: LongWord): string;
      function modulo(x, m: Integer): Integer;
     private
      {}
     end;
  var rules: TRules;
+
+
 implementation
 
 uses
   System.UITypes;
 
 {$R *.dfm}
+
+constructor TCellObject.Create( val : Integer = 0; amou : Integer = 0);
+begin
+  value := val;
+  amount := amou;
+end;
 
 procedure TfrmMain.FormCreate(Sender: TObject);
 var cellPrintSize: Integer;
@@ -83,7 +103,9 @@ begin
   boardImage.Canvas.Pen.Width := 1;
 
   boardImage.Canvas.Pen.Color := clBlack;
-
+  FColorList := TList<TColor>.Create;
+  FColorList.Add(clWhite);
+  FColorList.Add(clBlack);
 end;
 
 
@@ -92,7 +114,7 @@ end;
 procedure TfrmMain.initGridArray;
 var I,J: Integer;
 begin
-    gridArray[Round(maxWidth/2)-1][0] := 1;
+    gridArray[Round(maxWidth/2)-1][0].value := 1;
     for I := 0 to maxTime - 1 do begin
       for J := 0 to maxWidth - 1 do begin
           if cmbRuleType.Text = 'Rule1D' then begin
@@ -115,7 +137,13 @@ var I, J: Integer;
 begin
       for I := 0 to maxTime - 1 do begin
         for J := 0 to maxWidth - 1 do begin
-          gridArray[J][I] := 0;
+          gridArray[J][I] := TCellObject.Create;
+        end;
+      end;
+
+      for I := 0 to maxTime - 1 do begin
+        for J := 0 to maxWidth - 1 do begin
+          gridArray[J][I].value := 0;
         end;
       end;
 end;
@@ -127,7 +155,7 @@ begin
   SetLength(gridArray, maxWidth, maxTime);
   clearGridArray;
   boardImage.Canvas.Pen.Width := 1;
-  drawGrid;
+  drawColourGrid;
 end;
 
 procedure TfrmMain.drawCustom2DRuleGrid(typeOfStructure: String);
@@ -137,7 +165,7 @@ begin
   if typeOfStructure = 'losowy' then begin
     for X := 0 to maxWidth - 1 do begin
       for Y := 0 to maxTime - 1 do begin
-         gridArray[X][Y] := Random(2);
+         gridArray[X][Y].value := Random(2);
       end;
     end;
   end
@@ -145,9 +173,9 @@ begin
     for X := 1 to maxWidth - 2 do begin
       for Y := 1 to maxTime - 2 do begin
         if (X mod 4 = 0) and (Y mod 5 = 0) then begin
-         gridArray[X][Y] := 1;
-         gridArray[X - 1][Y] := 1;
-         gridArray[X + 1][Y] := 1;
+         gridArray[X][Y].value := 1;
+         gridArray[X - 1][Y].value := 1;
+         gridArray[X + 1][Y].value := 1;
         end;
       end;
     end;
@@ -156,12 +184,12 @@ begin
     for X := 1 to maxWidth - 3 do begin
       for Y := 1 to maxTime - 2 do begin
         if (X mod 5 = 0) and (Y mod 5 = 0) then begin
-         gridArray[X - 1][Y] := 1;
-         gridArray[X + 2][Y] := 1;
-         gridArray[X][Y + 1] := 1;
-         gridArray[X + 1][Y + 1] := 1;
-         gridArray[X][Y - 1] := 1;
-         gridArray[X + 1][Y - 1] := 1;
+         gridArray[X - 1][Y].value := 1;
+         gridArray[X + 2][Y].value := 1;
+         gridArray[X][Y + 1].value := 1;
+         gridArray[X + 1][Y + 1].value := 1;
+         gridArray[X][Y - 1].value := 1;
+         gridArray[X + 1][Y - 1].value := 1;
         end;
       end;
     end;
@@ -170,20 +198,41 @@ begin
     for X := 1 to maxWidth - 3 do begin
       for Y := 1 to maxTime - 2 do begin
         if (X mod 5 = 0) and (Y mod 5 = 0) then begin
-         gridArray[X - 1][Y] := 1;
-         gridArray[X][Y] := 1;
-         gridArray[X][Y + 1] := 1;
-         gridArray[X + 1][Y + 1] := 1;
-         gridArray[X + 1][Y - 1] := 1;
+         gridArray[X - 1][Y].value := 1;
+         gridArray[X][Y].value := 1;
+         gridArray[X][Y + 1].value := 1;
+         gridArray[X + 1][Y + 1].value := 1;
+         gridArray[X + 1][Y - 1].value := 1;
         end;
       end;
     end;
   end;
 
-  drawGrid;
+  drawColourGrid;
 end;
 
-procedure TfrmMain.drawGrid;
+procedure TfrmMain.SetColor;
+var
+  randomColor : TColor;
+  I: Integer;
+  isNew : Boolean;
+begin
+  randomColor := RGB(Random(255), Random(255), Random(255));
+  isNew := False;
+
+  while not isNew do begin
+    for I := 0 to FColorList.Count - 1 do begin
+      if randomColor = FColorList[I] then begin
+        randomColor := RGB(Random(255), Random(255), Random(255));
+        break;
+      end;
+    end;
+    isNew := True;
+  end;
+  FColorList.Add(randomColor);
+end;
+
+procedure TfrmMain.drawColourGrid;
 var I, J, startX, startY, cellPrintSize: Integer;
 begin
   clearCanvas;
@@ -192,23 +241,15 @@ begin
   startY := 0;
 
    for I := 0 to maxWidth - 1 do begin
-     for J := 0 to maxTime - 1 do begin
-     startX := I * cellPrintSize;
-     startY := J * cellPrintSize;
-       if gridArray[I][J] = 1 then begin
+       for J := 0 to maxTime - 1 do begin
+       startX := I * cellPrintSize;
+       startY := J * cellPrintSize;
           boardImage.Canvas.Pen.Color := clBlack;
-          boardImage.Canvas.Brush.Color := clBlack;
+          boardImage.Canvas.Brush.Color := FColorList[gridArray[I][J].value];
           boardImage.Canvas.Rectangle(startX, startY,startX + cellPrintSize, startY + cellPrintSize);
-       end
-       else if gridArray[I][J] = 0 then begin
-          boardImage.Canvas.Pen.Color := clBlack;
-          boardImage.Canvas.Brush.Color := clWhite;
-          boardImage.Canvas.Rectangle(startX, startY,startX + cellPrintSize, startY + cellPrintSize);
+         end
        end;
-     end;
   end;
-end;
-
 
 {Section: OnClicks}
 
@@ -227,7 +268,7 @@ SetLength(gridArray, maxWidth, maxTime);
 clearGridArray;
 initGridArray;
 boardImage.Canvas.Pen.Width := 1;
-drawGrid;
+drawColourGrid;
 //
 end;
 
@@ -247,7 +288,7 @@ begin
     btnDrawRule2D.Caption := 'Uruchom';
   end;
 
-  drawGrid;
+  drawColourGrid;
 end;
 
 procedure TfrmMain.boardImageClick(Sender: TObject);
@@ -265,8 +306,8 @@ begin
   y := Trunc((pt.Y)/cellPrintSize);
 
   setCellValue(x, y);
-
-  drawGrid;
+  SetColor;
+  drawColourGrid;
 
 end;
 
@@ -345,12 +386,19 @@ end;
 
 procedure TfrmMain.setCellValue(x, y: Integer);
 begin
-  if gridArray[x][y] = 0 then begin
-    gridArray[x][y] := 1
+if cmbRuleType.Text = 'Rule2D' then begin
+  if gridArray[x][y].value = 0 then begin
+    gridArray[x][y].value := 1
   end
-  else if gridArray[x][y] = 1 then begin
-    gridArray[x][y] := 0;
+  else if gridArray[x][y].value = 1 then begin
+    gridArray[x][y].value := 0;
   end;
+end else if cmbRuleType.Text = 'Grain' then begin
+   gridArray[x][y].value := gridArray[x][y].value + 1;
+end;
+
+
+
 end;
 
 procedure TfrmMain.TimerRule2DTimer(Sender: TObject);
@@ -358,7 +406,7 @@ var x, y: Integer;
     temp: Boolean;
 begin
   rules.rule2D;
-  drawGrid;
+  drawColourGrid;
 end;
 
 
@@ -400,19 +448,19 @@ procedure TRules.rule1D(x, y, leftCellValue, middleCellValue, rightCellValue, tr
   begin
 
     if x = 0 then begin
-      if (gridArray[maxWidth -1][y] = leftCellValue) and (gridArray[x, y] = middleCellValue) and (gridArray[x + 1, y] = rightCellValue) then begin
-         gridArray[x][y+1] := trueOrFalse;
+      if (gridArray[maxWidth - 1][y].value = leftCellValue) and (gridArray[x, y].value = middleCellValue) and (gridArray[x + 1, y].value = rightCellValue) then begin
+         gridArray[x][y+1].value := trueOrFalse;
       end;
     end
-    else if x = maxWidth -1 then begin
-      if (gridArray[x - 1][y] = leftCellValue) and (gridArray[x][y] = middleCellValue) and (gridArray[0][y] = rightCellValue) then begin
-         gridArray[x][y+1] := trueOrFalse;
+    else if x = maxWidth - 1 then begin
+      if (gridArray[x - 1][y].value = leftCellValue) and (gridArray[x][y].value = middleCellValue) and (gridArray[0][y].value = rightCellValue) then begin
+         gridArray[x][y+1].value := trueOrFalse;
       end;
     end
     else
     begin
-      if ((gridArray[x - 1][y] = leftCellValue) and (gridArray[x][y] = middleCellValue) and (gridArray[x + 1][y] = rightCellValue)) then begin
-          gridArray[x, y + 1] := trueOrFalse;
+      if ((gridArray[x - 1][y].value = leftCellValue) and (gridArray[x][y].value = middleCellValue) and (gridArray[x + 1][y].value = rightCellValue)) then begin
+          gridArray[x, y + 1].value := trueOrFalse;
       end;
     end;
   end;
@@ -426,7 +474,13 @@ procedure TRules.rule2D;
 var nextGridArray: TGridArray;
   X, Y, I, J, neighbours: Integer;
  begin
+
   SetLength(nextGridArray, maxWidth, maxTime);
+      for I := 0 to maxTime - 1 do begin
+        for J := 0 to maxWidth - 1 do begin
+          nextGridArray[J][I] := TCellObject.Create;
+        end;
+      end;
   // starting from 1s and subsiding 2 to dont care about boundary conditions
   for X := 0 to maxWidth - 1 do begin
     for Y := 0 to maxTime - 1 do begin
@@ -435,23 +489,23 @@ var nextGridArray: TGridArray;
       for I := - 1 to 1 do begin
         for J := -1 to 1 do begin
 
-           neighbours := neighbours + gridArray[modulo(X+I, maxWidth)][modulo(Y + J, maxTime)];
+           neighbours := neighbours + gridArray[modulo(X+I, maxWidth)][modulo(Y + J, maxTime)].value;
         end;
       end;
 
-      neighbours := neighbours - gridArray[X][Y];
+      neighbours := neighbours - gridArray[X][Y].value;
       //rules of Game Of Life
-      if (gridArray[X][Y] = 1) and (neighbours < 2) then begin
-       nextGridArray[X][Y] := 0;
+      if (gridArray[X][Y].value = 1) and (neighbours < 2) then begin
+       nextGridArray[X][Y].value := 0;
       end
-      else if (gridArray[X][Y] = 1) and (neighbours > 3) then begin
-       nextGridArray[X][Y] := 0;
+      else if (gridArray[X][Y].value = 1) and (neighbours > 3) then begin
+       nextGridArray[X][Y].value := 0;
       end
-      else if (gridArray[X][Y] = 0) and (neighbours = 3) then begin
-       nextGridArray[X][Y] := 1;
+      else if (gridArray[X][Y].value = 0) and (neighbours = 3) then begin
+       nextGridArray[X][Y].value := 1;
       end
       else begin
-        nextGridArray[X][Y] := gridArray[X][Y];
+        nextGridArray[X][Y].value := gridArray[X][Y].value;
       end;
 
 
@@ -460,4 +514,30 @@ var nextGridArray: TGridArray;
   end;
   gridArray := nextGridArray;
 end;
+
+procedure TRules.ruleVonNeumann;
+var nextGridArray: TGridArray;
+  X, Y, I, J, neighbours: Integer;
+    neighbourCellsArray: array of TCellObject;
+ begin
+  SetLength(nextGridArray, maxWidth, maxTime);
+  for I := 0 to maxTime - 1 do begin
+        for J := 0 to maxWidth - 1 do begin
+          nextGridArray[J][I] := TCellObject.Create;
+        end;
+      end;
+  SetLength(neighbourCellsArray, 4);
+  for X := 0 to maxWidth - 1 do begin
+    for Y := 0 to maxTime - 1 do begin
+
+      for I := 0 to 3 do begin
+        neighbourCellsArray[I].value := 0;
+        neighbourCellsArray[I].amount := 0;
+      end;
+    end;
+
+  end;
+  gridArray := nextGridArray;
+end;
+
 end.

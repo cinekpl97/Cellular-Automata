@@ -155,7 +155,8 @@ object frmMain: TfrmMain
       OnChange = cmbRuleTypeChange
       Items.Strings = (
         'Rule1D'
-        'Rule2D')
+        'Rule2D'
+        'Grain')
     end
     object cmbChooseRule2D: TComboBox
       Left = 30
