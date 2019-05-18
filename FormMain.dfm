@@ -139,7 +139,7 @@ object frmMain: TfrmMain
     end
     object cmbRuleType: TComboBox
       Left = 30
-      Top = 74
+      Top = 81
       Width = 121
       Height = 21
       Style = csDropDownList
@@ -156,7 +156,7 @@ object frmMain: TfrmMain
       Items.Strings = (
         'Rule1D'
         'Rule2D'
-        'Grain')
+        'Rozrost Ziaren')
     end
     object cmbChooseRule2D: TComboBox
       Left = 30
@@ -195,6 +195,48 @@ object frmMain: TfrmMain
       TabOrder = 7
       OnClick = btnCleanRefreshGridClick
     end
+    object cmbGrainGrowth: TComboBox
+      Left = 32
+      Top = 140
+      Width = 121
+      Height = 21
+      Style = csDropDownList
+      ItemIndex = 0
+      TabOrder = 8
+      Text = 'von Neumann'
+      Visible = False
+      Items.Strings = (
+        'von Neumann'
+        'Moore'
+        'hex'
+        'pent')
+    end
+    object cmbChooseGrainLocations: TComboBox
+      Left = 32
+      Top = 112
+      Width = 121
+      Height = 21
+      Style = csDropDownList
+      ItemIndex = 0
+      TabOrder = 9
+      Text = 'jednorodne'
+      Visible = False
+      Items.Strings = (
+        'jednorodne'
+        'losowe'
+        'z promieniem'
+        'r'#281'czna definicja')
+    end
+    object btnDrawGrainGrowth: TButton
+      Left = 48
+      Top = 170
+      Width = 81
+      Height = 23
+      Caption = 'Rysuj'
+      TabOrder = 10
+      Visible = False
+      OnClick = btnDrawGrainGrowthClick
+    end
   end
   object TimerRule2D: TTimer
     Enabled = False
@@ -202,5 +244,12 @@ object frmMain: TfrmMain
     OnTimer = TimerRule2DTimer
     Left = 696
     Top = 264
+  end
+  object TimerGrainGrowth: TTimer
+    Enabled = False
+    Interval = 750
+    OnTimer = TimerGrainGrowthTimer
+    Left = 696
+    Top = 200
   end
 end

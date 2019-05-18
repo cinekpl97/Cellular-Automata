@@ -23,6 +23,10 @@ type
     btnDrawRule2D: TButton;
     TimerRule2D: TTimer;
     btnCleanRefreshGrid: TButton;
+    cmbGrainGrowth: TComboBox;
+    cmbChooseGrainLocations: TComboBox;
+    btnDrawGrainGrowth: TButton;
+    TimerGrainGrowth: TTimer;
     procedure edtTimeChange(Sender: TObject);
     procedure edtSzerokoscChange(Sender: TObject);
     procedure initGridArray;
@@ -43,6 +47,9 @@ type
     procedure btnCleanRefreshGridClick(Sender: TObject);
     procedure cmbChooseRule2DChange(Sender: TObject);
     procedure drawCustom2DRuleGrid(typeOfStructure: String);
+    function listMaxValue(list: TList<Integer>): Integer;
+    procedure TimerGrainGrowthTimer(Sender: TObject);
+    procedure btnDrawGrainGrowthClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -242,8 +249,8 @@ begin
 
    for I := 0 to maxWidth - 1 do begin
        for J := 0 to maxTime - 1 do begin
-       startX := I * cellPrintSize;
-       startY := J * cellPrintSize;
+         startX := I * cellPrintSize;
+         startY := J * cellPrintSize;
           boardImage.Canvas.Pen.Color := clBlack;
           boardImage.Canvas.Brush.Color := FColorList[gridArray[I][J].value];
           boardImage.Canvas.Rectangle(startX, startY,startX + cellPrintSize, startY + cellPrintSize);
@@ -270,6 +277,24 @@ initGridArray;
 boardImage.Canvas.Pen.Width := 1;
 drawColourGrid;
 //
+end;
+
+procedure TfrmMain.btnDrawGrainGrowthClick(Sender: TObject);
+begin
+  if TimerGrainGrowth.Enabled = True then begin
+    TimerGrainGrowth.Enabled := False;
+  end
+  else if TimerGrainGrowth.Enabled = False then begin
+    TimerGrainGrowth.Enabled := True;
+  end;
+  if btnDrawGrainGrowth.Caption = 'Rysuj' then begin
+    btnDrawGrainGrowth.Caption := 'Zatrzymaj';
+  end
+  else if btnDrawGrainGrowth.Caption = 'Zatrzymaj' then begin
+    btnDrawGrainGrowth.Caption := 'Rysuj';
+  end;
+
+  drawColourGrid;
 end;
 
 procedure TfrmMain.btnDrawRule2DClick(Sender: TObject);
@@ -344,6 +369,10 @@ begin
      btnDraw.Visible := True;
      cmbChooseRule2D.Visible := False;
      btnDrawRule2D.Visible := False;
+
+     cmbGrainGrowth.Visible := False;
+     cmbChooseGrainLocations.Visible := False;
+     btnDrawGrainGrowth.Visible := False;
    end
    else if cmbRuleType.Text = 'Rule2D' then begin
       clearCanvas;
@@ -353,6 +382,22 @@ begin
      btnDraw.Visible := False;
      cmbChooseRule2D.Visible := True;
      btnDrawRule2D.Visible := True;
+
+     cmbGrainGrowth.Visible := False;
+     cmbChooseGrainLocations.Visible := False;
+     btnDrawGrainGrowth.Visible := False;
+   end
+   else if cmbRuleType.Text = 'Rozrost Ziaren' then begin
+     clearCanvas;
+     drawEmptyGrid;
+     lblRegula.Visible := False;
+     edtRuleNo.Visible := False;
+     btnDraw.Visible := False;
+     cmbChooseRule2D.Visible := False;
+     btnDrawRule2D.Visible := False;
+     cmbGrainGrowth.Visible := True;
+     cmbChooseGrainLocations.Visible := True;
+     btnDrawGrainGrowth.Visible := True;
    end;
 
 end;
@@ -393,12 +438,18 @@ if cmbRuleType.Text = 'Rule2D' then begin
   else if gridArray[x][y].value = 1 then begin
     gridArray[x][y].value := 0;
   end;
-end else if cmbRuleType.Text = 'Grain' then begin
+end else if cmbRuleType.Text = 'Rozrost Ziaren' then begin
    gridArray[x][y].value := gridArray[x][y].value + 1;
 end;
 
 
 
+end;
+
+procedure TfrmMain.TimerGrainGrowthTimer(Sender: TObject);
+begin
+  rules.ruleVonNeumann;
+  drawColourGrid;
 end;
 
 procedure TfrmMain.TimerRule2DTimer(Sender: TObject);
@@ -409,7 +460,22 @@ begin
   drawColourGrid;
 end;
 
+function TfrmMain.listMaxValue(list: TList<Integer>): Integer;
+var
+  I, valTmp, amount: Integer;
+begin
+  Result := 0;
+  amount := 0;
+  valTmp := 0;
+  Assert(list.Count > 0);
+  list.Sort;
+  for I := 0 to list.Count - 1 do begin
+    if True then
 
+
+  end;
+
+end;
 
 {
 TRules
@@ -481,7 +547,6 @@ var nextGridArray: TGridArray;
           nextGridArray[J][I] := TCellObject.Create;
         end;
       end;
-  // starting from 1s and subsiding 2 to dont care about boundary conditions
   for X := 0 to maxWidth - 1 do begin
     for Y := 0 to maxTime - 1 do begin
     neighbours := 0;
@@ -517,26 +582,51 @@ end;
 
 procedure TRules.ruleVonNeumann;
 var nextGridArray: TGridArray;
-  X, Y, I, J, neighbours: Integer;
-    neighbourCellsArray: array of TCellObject;
+  X, Y, I, J, max, neighbours: Integer;
+    neighbourCellsArray: TList<Integer>;
  begin
   SetLength(nextGridArray, maxWidth, maxTime);
   for I := 0 to maxTime - 1 do begin
-        for J := 0 to maxWidth - 1 do begin
-          nextGridArray[J][I] := TCellObject.Create;
-        end;
-      end;
-  SetLength(neighbourCellsArray, 4);
-  for X := 0 to maxWidth - 1 do begin
-    for Y := 0 to maxTime - 1 do begin
+    for J := 0 to maxWidth - 1 do begin
+      nextGridArray[J][I] := TCellObject.Create;
+    end;
+  end;
 
-      for I := 0 to 3 do begin
-        neighbourCellsArray[I].value := 0;
-        neighbourCellsArray[I].amount := 0;
-      end;
+  neighbourCellsArray := TList<Integer>.Create;
+    for I in neighbourCellsArray do begin
+     neighbourCellsArray[I] := 0;
     end;
 
+  for X := 0 to maxWidth - 1 do begin
+    for Y := 0 to maxTime - 1 do begin
+    neighbours := 0;
+    nextGridArray[X][Y].value := gridArray[X][Y].value;
+       if gridArray[X][Y].value = 0 then begin
+         if gridArray[modulo(X - 1, maxWidth)][modulo(Y, maxTime)].value <> 0 then begin
+           neighbourCellsArray.Add(gridArray[modulo(X - 1, maxWidth)][modulo(Y, maxTime)].value);
+           neighbours := neighbours + 1;
+         end;
+         if gridArray[modulo(X, maxWidth)][modulo(Y + 1, maxTime)].value <> 0 then begin
+           neighbourCellsArray.Add(gridArray[modulo(X, maxWidth)][modulo(Y + 1, maxTime)].value);
+           neighbours := neighbours + 1;
+         end;
+         if gridArray[modulo(X + 1, maxWidth)][modulo(Y, maxTime)].value <> 0 then begin
+           neighbourCellsArray.Add(gridArray[modulo(X + 1, maxWidth)][modulo(Y, maxTime)].value);
+           neighbours := neighbours + 1;
+         end;
+         if gridArray[modulo(X, maxWidth)][modulo(Y - 1, maxTime)].value <> 0 then begin
+           neighbourCellsArray.Add(gridArray[modulo(X, maxWidth)][modulo(Y - 1, maxTime)].value);
+           neighbours := neighbours + 1;
+         end;
+
+
+         if neighbours > 0 then nextGridArray[X][Y].value := frmMain.listMaxValue(neighbourCellsArray);
+       end;
+
+    end;
   end;
+
+
   gridArray := nextGridArray;
 end;
 
