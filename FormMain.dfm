@@ -237,6 +237,19 @@ object frmMain: TfrmMain
       Visible = False
       OnClick = btnDrawGrainGrowthClick
     end
+    object cmbBoundaryConditions: TComboBox
+      Left = 32
+      Top = 240
+      Width = 121
+      Height = 21
+      Style = csDropDownList
+      ItemIndex = 0
+      TabOrder = 11
+      Text = 'absorpcyjne'
+      Items.Strings = (
+        'absorpcyjne'
+        'periodyczne')
+    end
   end
   object TimerRule2D: TTimer
     Enabled = False
