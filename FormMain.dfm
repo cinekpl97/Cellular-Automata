@@ -217,9 +217,9 @@ object frmMain: TfrmMain
       Width = 121
       Height = 21
       Style = csDropDownList
-      ItemIndex = 0
+      ItemIndex = 3
       TabOrder = 9
-      Text = 'jednorodne'
+      Text = 'r'#281'czna definicja'
       Visible = False
       Items.Strings = (
         'jednorodne'

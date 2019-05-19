@@ -47,7 +47,7 @@ type
     procedure btnCleanRefreshGridClick(Sender: TObject);
     procedure cmbChooseRule2DChange(Sender: TObject);
     procedure drawCustom2DRuleGrid(typeOfStructure: String);
-    function listMaxValue(list: TList<Integer>): Integer;
+    function mostFrequentValue(valuesArray: TArray<Integer>): Integer;
     procedure TimerGrainGrowthTimer(Sender: TObject);
     procedure btnDrawGrainGrowthClick(Sender: TObject);
   private
@@ -460,21 +460,36 @@ begin
   drawColourGrid;
 end;
 
-function TfrmMain.listMaxValue(list: TList<Integer>): Integer;
+function TfrmMain.mostFrequentValue(valuesArray: TArray<Integer>): Integer;
 var
-  I, valTmp, amount: Integer;
+  I, maxCount, currentCount, value: Integer;
 begin
-  Result := 0;
-  amount := 0;
-  valTmp := 0;
-  Assert(list.Count > 0);
-  list.Sort;
-  for I := 0 to list.Count - 1 do begin
-    if True then
+  Result := valuesArray[0];
+  maxCount := 1;
+  currentCount := 1;
+  TArray.Sort<Integer>(valuesArray);
+
+    for I := 1 to Length(valuesArray) do begin
+       if valuesArray[I] <> 0 then begin
+         if valuesArray[I] = valuesArray[I - 1] then begin
+         currentCount := currentCount + 1;
+       end
+       else begin
+         if currentCount > maxCount then begin
+           maxCount := currentCount;
+           Result := valuesArray[I - 1];
+         end;
+         currentCount := 1;
+       end;
+       end;
 
 
-  end;
-
+    end;
+    // If last element is most frequent
+    if (currentCount >= maxCount) and (valuesArray[Length(valuesArray) - 1] <> 0) then begin
+       maxCount := currentCount;
+       Result := valuesArray[Length(valuesArray) - 1];
+    end;
 end;
 
 {
@@ -531,7 +546,7 @@ procedure TRules.rule1D(x, y, leftCellValue, middleCellValue, rightCellValue, tr
     end;
   end;
 
-function TRules.modulo(x,m: Integer): Integer;
+function TRules.modulo(x, m: Integer): Integer;
 begin
    Result := (x mod m + m) mod m;
 end;
@@ -583,7 +598,7 @@ end;
 procedure TRules.ruleVonNeumann;
 var nextGridArray: TGridArray;
   X, Y, I, J, max, neighbours: Integer;
-    neighbourCellsArray: TList<Integer>;
+  neighbourCellsArray: TArray<Integer>;
  begin
   SetLength(nextGridArray, maxWidth, maxTime);
   for I := 0 to maxTime - 1 do begin
@@ -592,41 +607,23 @@ var nextGridArray: TGridArray;
     end;
   end;
 
-  neighbourCellsArray := TList<Integer>.Create;
-    for I in neighbourCellsArray do begin
-     neighbourCellsArray[I] := 0;
-    end;
+  neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0);
 
   for X := 0 to maxWidth - 1 do begin
     for Y := 0 to maxTime - 1 do begin
     neighbours := 0;
     nextGridArray[X][Y].value := gridArray[X][Y].value;
        if gridArray[X][Y].value = 0 then begin
-         if gridArray[modulo(X - 1, maxWidth)][modulo(Y, maxTime)].value <> 0 then begin
-           neighbourCellsArray.Add(gridArray[modulo(X - 1, maxWidth)][modulo(Y, maxTime)].value);
-           neighbours := neighbours + 1;
-         end;
-         if gridArray[modulo(X, maxWidth)][modulo(Y + 1, maxTime)].value <> 0 then begin
-           neighbourCellsArray.Add(gridArray[modulo(X, maxWidth)][modulo(Y + 1, maxTime)].value);
-           neighbours := neighbours + 1;
-         end;
-         if gridArray[modulo(X + 1, maxWidth)][modulo(Y, maxTime)].value <> 0 then begin
-           neighbourCellsArray.Add(gridArray[modulo(X + 1, maxWidth)][modulo(Y, maxTime)].value);
-           neighbours := neighbours + 1;
-         end;
-         if gridArray[modulo(X, maxWidth)][modulo(Y - 1, maxTime)].value <> 0 then begin
-           neighbourCellsArray.Add(gridArray[modulo(X, maxWidth)][modulo(Y - 1, maxTime)].value);
-           neighbours := neighbours + 1;
-         end;
+         neighbourCellsArray[0] := gridArray[modulo(X - 1, maxWidth)][modulo(Y, maxTime)].value;
+         neighbourCellsArray[1] := gridArray[modulo(X, maxWidth)][modulo(Y + 1, maxTime)].value;
+         neighbourCellsArray[2] := gridArray[modulo(X + 1, maxWidth)][modulo(Y, maxTime)].value;
+         neighbourCellsArray[3] := gridArray[modulo(X, maxWidth)][modulo(Y - 1, maxTime)].value;
 
-
-         if neighbours > 0 then nextGridArray[X][Y].value := frmMain.listMaxValue(neighbourCellsArray);
+         nextGridArray[X][Y].value := frmMain.mostFrequentValue(neighbourCellsArray);
        end;
 
     end;
   end;
-
-
   gridArray := nextGridArray;
 end;
 
