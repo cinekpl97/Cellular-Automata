@@ -31,6 +31,7 @@ type
     edtRowCellAmount: TEdit;
     edtColumnCellAmount: TEdit;
     edtRandomAmount: TEdit;
+    cmbHexagonalType: TComboBox;
     procedure edtTimeChange(Sender: TObject);
     procedure edtSzerokoscChange(Sender: TObject);
     procedure initGridArray;
@@ -57,6 +58,7 @@ type
     procedure cmbChooseGrainLocationsChange(Sender: TObject);
     procedure edtRowCellAmountChange(Sender: TObject);
     procedure edtColumnCellAmountChange(Sender: TObject);
+    procedure cmbGrainGrowthChange(Sender: TObject);
   private
     { Private declarations }
   public
@@ -87,7 +89,8 @@ type
      procedure rule2D;
      procedure ruleVonNeumann;
      procedure Moore;
-     procedure Hexagonal;
+     procedure pentagonal;
+     procedure hexagonal;
      function IntToBinLowByte(Value: LongWord): string;
      function modulo(x, m: Integer): Integer;
     private
@@ -419,6 +422,16 @@ begin
 
 end;
 
+procedure TfrmMain.cmbGrainGrowthChange(Sender: TObject);
+begin
+  if cmbGrainGrowth.Text = 'heksagonalne' then begin
+    cmbHexagonalType.Visible := True;
+  end else begin
+    cmbHexagonalType.Visible := False;
+  end;
+
+end;
+
 procedure TfrmMain.cmbRuleTypeChange(Sender: TObject);
 begin
    if cmbRuleType.Text = 'Rule1D' then begin
@@ -520,8 +533,14 @@ procedure TfrmMain.TimerGrainGrowthTimer(Sender: TObject);
 begin
   if cmbGrainGrowth.Text = 'von Neumann' then begin
     rules.ruleVonNeumann;
-  end
-  else if cmbGrainGrowth.Text = 'Moore' then rules.Moore;
+  end else if cmbGrainGrowth.Text = 'Moore' then begin
+   rules.Moore;
+  end else if cmbGrainGrowth.Text = 'pentagonalne losowe' then begin
+    rules.pentagonal;
+  end else if cmbGrainGrowth.Text = 'heksagonalne' then begin
+    rules.hexagonal;
+  end;
+
 
 
 
@@ -568,71 +587,6 @@ begin
         maxValue := dictionaryOfValues[Key];
       end;
     end;
-
-
-
-
-//    maxList := TList<Integer>.Create;
-//    dictionaryOfValues := TDictionary<Integer, Integer>.Create;
-//    for I := 0 to Length(valuesArray) - 1 do begin
-//      if dictionaryOfValues.ContainsKey(valuesArray[I]) then begin
-//
-//        dictionaryOfValues[valuesArray[I]] := dictionaryOfValues[valuesArray[I]] + 1;
-//        if maxValue < dictionaryOfValues[valuesArray[I]] then begin
-//
-//          secondMaxValue := maxValue;
-//         maxValue := dictionaryOfValues[valuesArray[I]];
-//
-//        end;
-//      end else if not (dictionaryOfValues.ContainsKey(valuesArray[I])) and (valuesArray[I] <> 0) then begin
-//        dictionaryOfValues.AddOrSetValue(valuesArray[I], 1);
-//      end;
-//    end;
-//
-//    for Key in dictionaryOfValues.Keys do begin
-//      if (dictionaryOfValues[Key] = maxValue) and (Key <> 0) then begin
-//        maxList.Add(Key);
-//        isValueFound := True;
-//      end;
-//    end;
-//    if isValueFound = False then begin
-//      for Key in dictionaryOfValues.Keys do begin
-//        if (dictionaryOfValues[Key] = secondMaxValue) and (Key <> 0) then begin
-//          maxList.Add(Key);
-//          isValueFound := True;
-//        end;
-//      end;
-//    end;
-//
-//    if maxList.Count <> 0 then begin
-//      Result := maxList[Random(maxList.Count)];
-//    end;
-
-
-
-//  maxValue := 1;
-//  currentValue := 1;
-//  TArray.Sort<Integer>(valuesArray);
-//  Result := valuesArray[0];
-//    for I := 1 to Length(valuesArray) do begin
-//       if valuesArray[I] = valuesArray[I - 1] then begin
-//         currentValue := currentValue + 1;
-//       end
-//       else begin
-//         if currentValue > maxValue then begin
-//           maxValue := currentValue;
-//           Result := valuesArray[I - 1];
-//         end;
-//         currentValue := 1;
-//       end;
-//    end;
-//    // If last element is most frequent
-//    if (currentValue > maxValue) then begin
-//       maxValue := currentValue;
-//       Result := valuesArray[Length(valuesArray) - 1];
-//    end;
-
-
 end;
 
 {
@@ -841,36 +795,46 @@ var nextGridArray: TGridArray;
   gridArray := nextGridArray;
 end;
 
-procedure TRules.Hexagonal;
+procedure TRules.pentagonal;
 var nextGridArray: TGridArray;
-  X, Y, I, J, neighboursCounter, xCell, yCell, exceptionRowOrColumnNumber, RowOrColumn: Integer;
+  X, Y, I, J, neighboursCounter, xCell, yCell, exceptionRowOrColumnNumber,
+   RowOrColumn, leftColumn, rightColumn, topRow, bottomRow: Integer;
   neighbourCellsArray: TArray<Integer>;
  begin
+ //function mostly copied from Moore neighbourhood, added only limit for row or column
   SetLength(nextGridArray, maxWidth, maxTime);
   for I := 0 to maxTime - 1 do begin
     for J := 0 to maxWidth - 1 do begin
       nextGridArray[J][I] := TCellObject.Create;
     end;
   end;
-
+  //pentagonal has only 5 neighbours
   neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0);
-
+  //needed to set random which row/column to cut
+  leftColumn := -1;
+  rightColumn := 1;
+  topRow := 1;
+  bottomRow := -1;
+  //setting cut values
+  exceptionRowOrColumnNumber := Random(2);
+  RowOrColumn := Random(2);
+  //each if means which row or column to cut, there are four possibilities
+  if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 0) then begin
+    bottomRow := 0;
+  end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 0) then begin
+    topRow := 0;
+  end else if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 1) then begin
+    leftColumn := 0;
+  end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 1) then begin
+    rightColumn := 0;
+  end;
 
   for X := 0 to maxWidth - 1 do begin
       for Y := 0 to maxTime - 1 do begin
       neighboursCounter := 0;
-      while exceptionRowOrColumnNumber = 0 do exceptionRowOrColumnNumber := Random(3) - 1;
-      RowOrColumn := Random(3) - 1;
-
-        for I := -1 to 1 do begin
-          for J := -1 to 1 do begin    
-              if not (I = exceptionRowOrColumnNumber) then begin
-              
-              end;
-
-
-
-            
+  // I and J are limited not to check neighbours for one column or row
+        for I := leftColumn to rightColumn do begin
+          for J := bottomRow to topRow do begin
             if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
               xCell := modulo(X + I, maxWidth);
               yCell := modulo(Y + J, maxTime);
@@ -889,6 +853,89 @@ var nextGridArray: TGridArray;
                 neighbourCellsArray[neighboursCounter] := gridArray[modulo(X + I, maxWidth)][modulo(Y + J, maxTime)].value;
                 neighboursCounter := neighboursCounter + 1;
               end;
+            end;
+         end;
+        end;
+
+        if gridArray[X][Y].value = 0 then begin
+         nextGridArray[X][Y].value := frmMain.mostFrequentValue(neighbourCellsArray);
+        end else begin
+         nextGridArray[X][Y].value := gridArray[X][Y].value;
+        end;
+
+      end;
+  end;
+  gridArray := nextGridArray;
+end;
+
+procedure TRules.hexagonal;
+var nextGridArray: TGridArray;
+  X, Y, I, J, neighboursCounter, xCell, yCell, exceptionRowOrColumnNumber,
+   RowOrColumn, xFirstCorner, yFirstCorner, xSecondCorner, ySecondCorner: Integer;
+  neighbourCellsArray: TArray<Integer>;
+ begin
+ //function mostly copied from pentagonal neighbourhood, changed to corner options
+  SetLength(nextGridArray, maxWidth, maxTime);
+  for I := 0 to maxTime - 1 do begin
+    for J := 0 to maxWidth - 1 do begin
+      nextGridArray[J][I] := TCellObject.Create;
+    end;
+  end;
+  //hexagonal has only 6 neighbours
+  neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0, 0);
+
+  if frmMain.cmbHexagonalType.Text = 'lewo' then begin
+    xFirstCorner := -1;
+    yFirstCorner := 1;
+
+    xSecondCorner := 1;
+    ySecondCorner := -1;
+
+  end else if frmMain.cmbHexagonalType.Text = 'prawo' then begin
+    xFirstCorner := -1;
+    yFirstCorner := -1;
+
+    xSecondCorner := 1;
+    ySecondCorner := 1;
+
+  end else if frmMain.cmbHexagonalType.Text = 'losowe' then begin
+    if Random(2) = 0 then begin
+      xFirstCorner := -1;
+      yFirstCorner := 1;
+
+      xSecondCorner := 1;
+      ySecondCorner := -1;
+    end else begin
+      xFirstCorner := -1;
+      yFirstCorner := -1;
+
+      xSecondCorner := 1;
+      ySecondCorner := 1;
+    end;
+
+
+  end;
+  for X := 0 to maxWidth - 1 do begin
+      for Y := 0 to maxTime - 1 do begin
+      neighboursCounter := 0;
+        for I := -1 to 1 do begin
+          for J := -1 to 1 do begin
+            if not (((I = 0) and (J = 0)) or ((I = xFirstCorner) and (J = yFirstCorner))
+              or ((I = xSecondCorner) and (J = ySecondCorner))) then begin
+              if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+              xCell := modulo(X + I, maxWidth);
+              yCell := modulo(Y + J, maxTime);
+              if X + I <= 0 then xCell := 0;
+              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+              if Y + J > maxTime - 1 then yCell := maxTime - 1;
+              if Y + J < 0 then yCell := 0;
+                neighbourCellsArray[neighboursCounter] := gridArray[xCell][yCell].value;
+                neighboursCounter := neighboursCounter + 1;
+            end
+            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+                neighbourCellsArray[neighboursCounter] := gridArray[modulo(X + I, maxWidth)][modulo(Y + J, maxTime)].value;
+                neighboursCounter := neighboursCounter + 1;
+            end;
             end;
          end;
         end;

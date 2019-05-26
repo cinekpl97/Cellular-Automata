@@ -205,6 +205,7 @@ object frmMain: TfrmMain
       TabOrder = 8
       Text = 'von Neumann'
       Visible = False
+      OnChange = cmbGrainGrowthChange
       Items.Strings = (
         'von Neumann'
         'Moore'
@@ -283,6 +284,21 @@ object frmMain: TfrmMain
       Text = '0'
       Visible = False
     end
+    object cmbHexagonalType: TComboBox
+      Left = 32
+      Top = 398
+      Width = 121
+      Height = 21
+      Style = csDropDownList
+      ItemIndex = 0
+      TabOrder = 15
+      Text = 'lewo'
+      Visible = False
+      Items.Strings = (
+        'lewo'
+        'prawo'
+        'losowe')
+    end
   end
   object TimerRule2D: TTimer
     Enabled = False
@@ -293,7 +309,7 @@ object frmMain: TfrmMain
   end
   object TimerGrainGrowth: TTimer
     Enabled = False
-    Interval = 750
+    Interval = 500
     OnTimer = TimerGrainGrowthTimer
     Left = 696
     Top = 200
