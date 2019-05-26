@@ -208,8 +208,8 @@ object frmMain: TfrmMain
       Items.Strings = (
         'von Neumann'
         'Moore'
-        'hex'
-        'pent')
+        'heksagonalne'
+        'pentagonalne losowe')
     end
     object cmbChooseGrainLocations: TComboBox
       Left = 32
@@ -221,6 +221,7 @@ object frmMain: TfrmMain
       TabOrder = 9
       Text = 'r'#281'czna definicja'
       Visible = False
+      OnChange = cmbChooseGrainLocationsChange
       Items.Strings = (
         'jednorodne'
         'losowe'
@@ -249,6 +250,38 @@ object frmMain: TfrmMain
       Items.Strings = (
         'absorpcyjne'
         'periodyczne')
+    end
+    object edtRowCellAmount: TEdit
+      Left = 72
+      Top = 288
+      Width = 95
+      Height = 21
+      NumbersOnly = True
+      TabOrder = 12
+      Text = '0'
+      Visible = False
+      OnChange = edtRowCellAmountChange
+    end
+    object edtColumnCellAmount: TEdit
+      Left = 72
+      Top = 328
+      Width = 95
+      Height = 21
+      NumbersOnly = True
+      TabOrder = 13
+      Text = '0'
+      Visible = False
+      OnChange = edtColumnCellAmountChange
+    end
+    object edtRandomAmount: TEdit
+      Left = 72
+      Top = 371
+      Width = 95
+      Height = 21
+      NumbersOnly = True
+      TabOrder = 14
+      Text = '0'
+      Visible = False
     end
   end
   object TimerRule2D: TTimer

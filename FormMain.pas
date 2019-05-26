@@ -28,6 +28,9 @@ type
     btnDrawGrainGrowth: TButton;
     TimerGrainGrowth: TTimer;
     cmbBoundaryConditions: TComboBox;
+    edtRowCellAmount: TEdit;
+    edtColumnCellAmount: TEdit;
+    edtRandomAmount: TEdit;
     procedure edtTimeChange(Sender: TObject);
     procedure edtSzerokoscChange(Sender: TObject);
     procedure initGridArray;
@@ -51,6 +54,9 @@ type
     function mostFrequentValue(valuesArray: TArray<Integer>): Integer;
     procedure TimerGrainGrowthTimer(Sender: TObject);
     procedure btnDrawGrainGrowthClick(Sender: TObject);
+    procedure cmbChooseGrainLocationsChange(Sender: TObject);
+    procedure edtRowCellAmountChange(Sender: TObject);
+    procedure edtColumnCellAmountChange(Sender: TObject);
   private
     { Private declarations }
   public
@@ -80,6 +86,8 @@ type
      procedure rule1D(x, y, leftCellValue, middleCellValue, rightCellValue, trueOrFalse: Integer);
      procedure rule2D;
      procedure ruleVonNeumann;
+     procedure Moore;
+     procedure Hexagonal;
      function IntToBinLowByte(Value: LongWord): string;
      function modulo(x, m: Integer): Integer;
     private
@@ -340,6 +348,57 @@ end;
 
 {Section: OnChange}
 
+procedure TfrmMain.cmbChooseGrainLocationsChange(Sender: TObject);
+var X, Y, I, J, trueOrFalse, counter, xLocationStep, yLocationStep: Integer;
+begin
+  counter := 1;
+  clearGridArray;
+  clearCanvas;
+  if edtColumnCellAmount.Text = '' then edtColumnCellAmount.Text := '1';
+  if edtRowCellAmount.Text = '' then edtRowCellAmount.Text := '1';
+  if cmbChooseGrainLocations.Text = 'jednorodne' then begin
+    edtRowCellAmount.Visible := True;
+    edtColumnCellAmount.Visible := True;
+    edtRandomAmount.Visible := False;
+    xLocationStep := Trunc(maxWidth/(StrToInt(edtRowCellAmount.Text) + 1));
+    yLocationStep := Trunc(maxTime/(StrToInt(edtColumnCellAmount.Text) + 1));
+    for I := 1 to StrToInt(edtRowCellAmount.Text) do begin
+      for J := 1 to StrToInt(edtColumnCellAmount.Text) do begin
+        gridArray[I*xLocationStep - 1][J*yLocationStep - 1].value := counter;
+        SetColor;
+        counter := counter + 1;
+      end;
+    end;
+
+  end
+  else if cmbChooseGrainLocations.Text = 'losowe' then begin
+    edtRowCellAmount.Visible := False;
+    edtColumnCellAmount.Visible := False;
+    edtRandomAmount.Visible := True;
+    counter := 1;
+    for X := 0 to maxWidth - 1 do begin
+      for Y := 0 to maxTime - 1 do begin
+        trueOrFalse := Random(20); //probability 1/20 to draw colour
+        if trueOrFalse = 1 then begin
+          if (StrToInt(edtRandomAmount.Text) >= counter) then begin
+           gridArray[X][Y].value := counter;
+           SetColor;
+           counter := counter + 1;
+          end;
+        end;
+      end;
+    end;
+  end
+  else if cmbChooseGrainLocations.Text = 'z promieniem' then begin
+
+  end;
+
+
+
+  drawColourGrid;
+
+end;
+
 procedure TfrmMain.cmbChooseRule2DChange(Sender: TObject);
 begin
   if cmbChooseRule2D.Text = 'oscylator' then begin
@@ -403,6 +462,16 @@ begin
 
 end;
 
+procedure TfrmMain.edtColumnCellAmountChange(Sender: TObject);
+begin
+  if edtColumnCellAmount.Text = '' then edtColumnCellAmount.Text := '1';
+end;
+
+procedure TfrmMain.edtRowCellAmountChange(Sender: TObject);
+begin
+  if edtRowCellAmount.Text = '' then edtRowCellAmount.Text := '1';
+end;
+
 procedure TfrmMain.edtRuleNoChange(Sender: TObject);
 begin
   if edtRuleNo.Text = '' then edtRuleNo.Text := '0';
@@ -449,7 +518,13 @@ end;
 
 procedure TfrmMain.TimerGrainGrowthTimer(Sender: TObject);
 begin
-  rules.ruleVonNeumann;
+  if cmbGrainGrowth.Text = 'von Neumann' then begin
+    rules.ruleVonNeumann;
+  end
+  else if cmbGrainGrowth.Text = 'Moore' then rules.Moore;
+
+
+
   drawColourGrid;
 end;
 
@@ -463,34 +538,101 @@ end;
 
 function TfrmMain.mostFrequentValue(valuesArray: TArray<Integer>): Integer;
 var
-  I, maxCount, currentCount, value: Integer;
+  I, Key, maxValue, frequency: Integer;
+  dictionaryOfValues: TDictionary<Integer, Integer>;
+  maxList: TList<Integer>;
+  isValueFound: Boolean;
 begin
-  Result := valuesArray[0];
-  maxCount := 1;
-  currentCount := 1;
-  TArray.Sort<Integer>(valuesArray);
+    Result := 1;
 
-    for I := 1 to Length(valuesArray) do begin
-       if valuesArray[I] <> 0 then begin
-         if valuesArray[I] = valuesArray[I - 1] then begin
-         currentCount := currentCount + 1;
-       end
-       else begin
-         if currentCount > maxCount then begin
-           maxCount := currentCount;
-           Result := valuesArray[I - 1];
-         end;
-         currentCount := 1;
-       end;
-       end;
+    isValueFound := False;
+    maxValue := 0;
 
-
+    dictionaryOfValues := TDictionary<Integer, Integer>.Create;
+    for I := 0 to Length(valuesArray) - 1 do begin
+      Key := valuesArray[I];
+      if (dictionaryOfValues.ContainsKey(Key)) and (Key <> 0) then begin
+        frequency := dictionaryOfValues[Key];
+        frequency := frequency + 1;
+        dictionaryOfValues.AddOrSetValue(Key, frequency);
+      end else begin
+        if Key <> 0 then dictionaryOfValues.Add(Key, 1);
+      end;
     end;
-    // If last element is most frequent
-    if (currentCount >= maxCount) and (valuesArray[Length(valuesArray) - 1] <> 0) then begin
-       maxCount := currentCount;
-       Result := valuesArray[Length(valuesArray) - 1];
+
+    maxValue := 0;
+    Result := 0;
+    for Key in dictionaryOfValues.Keys do begin
+      if maxValue < dictionaryOfValues[Key] then begin
+        Result := Key;
+        maxValue := dictionaryOfValues[Key];
+      end;
     end;
+
+
+
+
+//    maxList := TList<Integer>.Create;
+//    dictionaryOfValues := TDictionary<Integer, Integer>.Create;
+//    for I := 0 to Length(valuesArray) - 1 do begin
+//      if dictionaryOfValues.ContainsKey(valuesArray[I]) then begin
+//
+//        dictionaryOfValues[valuesArray[I]] := dictionaryOfValues[valuesArray[I]] + 1;
+//        if maxValue < dictionaryOfValues[valuesArray[I]] then begin
+//
+//          secondMaxValue := maxValue;
+//         maxValue := dictionaryOfValues[valuesArray[I]];
+//
+//        end;
+//      end else if not (dictionaryOfValues.ContainsKey(valuesArray[I])) and (valuesArray[I] <> 0) then begin
+//        dictionaryOfValues.AddOrSetValue(valuesArray[I], 1);
+//      end;
+//    end;
+//
+//    for Key in dictionaryOfValues.Keys do begin
+//      if (dictionaryOfValues[Key] = maxValue) and (Key <> 0) then begin
+//        maxList.Add(Key);
+//        isValueFound := True;
+//      end;
+//    end;
+//    if isValueFound = False then begin
+//      for Key in dictionaryOfValues.Keys do begin
+//        if (dictionaryOfValues[Key] = secondMaxValue) and (Key <> 0) then begin
+//          maxList.Add(Key);
+//          isValueFound := True;
+//        end;
+//      end;
+//    end;
+//
+//    if maxList.Count <> 0 then begin
+//      Result := maxList[Random(maxList.Count)];
+//    end;
+
+
+
+//  maxValue := 1;
+//  currentValue := 1;
+//  TArray.Sort<Integer>(valuesArray);
+//  Result := valuesArray[0];
+//    for I := 1 to Length(valuesArray) do begin
+//       if valuesArray[I] = valuesArray[I - 1] then begin
+//         currentValue := currentValue + 1;
+//       end
+//       else begin
+//         if currentValue > maxValue then begin
+//           maxValue := currentValue;
+//           Result := valuesArray[I - 1];
+//         end;
+//         currentValue := 1;
+//       end;
+//    end;
+//    // If last element is most frequent
+//    if (currentValue > maxValue) then begin
+//       maxValue := currentValue;
+//       Result := valuesArray[Length(valuesArray) - 1];
+//    end;
+
+
 end;
 
 {
@@ -647,4 +789,118 @@ var nextGridArray: TGridArray;
   gridArray := nextGridArray;
 end;
 
+procedure TRules.Moore;
+var nextGridArray: TGridArray;
+  X, Y, I, J, max, neighboursCounter, xCell, yCell: Integer;
+  neighbourCellsArray: TArray<Integer>;
+ begin
+  SetLength(nextGridArray, maxWidth, maxTime);
+  for I := 0 to maxTime - 1 do begin
+    for J := 0 to maxWidth - 1 do begin
+      nextGridArray[J][I] := TCellObject.Create;
+    end;
+  end;
+
+  neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0, 0, 0, 0);
+
+  for X := 0 to maxWidth - 1 do begin
+      for Y := 0 to maxTime - 1 do begin
+      neighboursCounter := 0;
+
+        for I := -1 to 1 do begin
+          for J := -1 to 1 do begin
+            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+              xCell := modulo(X + I, maxWidth);
+              yCell := modulo(Y + J, maxTime);
+              if X + I <= 0 then xCell := 0;
+              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+              if Y + J > maxTime - 1 then yCell := maxTime - 1;
+              if Y + J < 0 then yCell := 0;
+              if not ((I = 0) and (J = 0)) then begin
+                neighbourCellsArray[neighboursCounter] := gridArray[xCell][yCell].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end
+            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+              if not ((I = 0) and (J = 0)) then begin
+                neighbourCellsArray[neighboursCounter] := gridArray[modulo(X + I, maxWidth)][modulo(Y + J, maxTime)].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end;
+         end;
+        end;
+
+        if gridArray[X][Y].value = 0 then begin
+         nextGridArray[X][Y].value := frmMain.mostFrequentValue(neighbourCellsArray);
+        end else begin
+         nextGridArray[X][Y].value := gridArray[X][Y].value;
+        end;
+
+      end;
+  end;
+  gridArray := nextGridArray;
+end;
+
+procedure TRules.Hexagonal;
+var nextGridArray: TGridArray;
+  X, Y, I, J, neighboursCounter, xCell, yCell, exceptionRowOrColumnNumber, RowOrColumn: Integer;
+  neighbourCellsArray: TArray<Integer>;
+ begin
+  SetLength(nextGridArray, maxWidth, maxTime);
+  for I := 0 to maxTime - 1 do begin
+    for J := 0 to maxWidth - 1 do begin
+      nextGridArray[J][I] := TCellObject.Create;
+    end;
+  end;
+
+  neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0);
+
+
+  for X := 0 to maxWidth - 1 do begin
+      for Y := 0 to maxTime - 1 do begin
+      neighboursCounter := 0;
+      while exceptionRowOrColumnNumber = 0 do exceptionRowOrColumnNumber := Random(3) - 1;
+      RowOrColumn := Random(3) - 1;
+
+        for I := -1 to 1 do begin
+          for J := -1 to 1 do begin    
+              if not (I = exceptionRowOrColumnNumber) then begin
+              
+              end;
+
+
+
+            
+            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+              xCell := modulo(X + I, maxWidth);
+              yCell := modulo(Y + J, maxTime);
+              if X + I <= 0 then xCell := 0;
+              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+              if Y + J > maxTime - 1 then yCell := maxTime - 1;
+              if Y + J < 0 then yCell := 0;
+              if not ((I = 0) and (J = 0)) then begin
+
+                neighbourCellsArray[neighboursCounter] := gridArray[xCell][yCell].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end
+            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+              if not ((I = 0) and (J = 0)) then begin
+                neighbourCellsArray[neighboursCounter] := gridArray[modulo(X + I, maxWidth)][modulo(Y + J, maxTime)].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end;
+         end;
+        end;
+
+        if gridArray[X][Y].value = 0 then begin
+         nextGridArray[X][Y].value := frmMain.mostFrequentValue(neighbourCellsArray);
+        end else begin
+         nextGridArray[X][Y].value := gridArray[X][Y].value;
+        end;
+
+      end;
+  end;
+  gridArray := nextGridArray;
+end;
 end.
