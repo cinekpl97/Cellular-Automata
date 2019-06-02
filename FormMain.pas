@@ -73,7 +73,9 @@ type
    value: Integer;
    amount: Integer;
    x, y : Integer;
-   constructor Create( val : Integer = 0; amou : Integer = 0; x : Integer = 0; y : Integer = 0);
+   centerOfGravityX : Double;
+   centerOfGravityY : Double;
+   constructor Create( val : Integer = 0; amou : Integer = 0; x : Integer = 0; y : Integer = 0; centerOfGravityX : Double = 0; centerOfGravityY : Double = 0);
   end;
 
   type
@@ -94,6 +96,7 @@ type
      procedure Moore;
      procedure pentagonal;
      procedure hexagonal;
+     procedure withRadius;
      function IntToBinLowByte(Value: LongWord): string;
      function modulo(x, m: Integer): Integer;
     private
@@ -115,12 +118,19 @@ uses
 
 {$R *.dfm}
 
-constructor TCellObject.Create( val : Integer = 0; amou : Integer = 0; x : Integer = 0; y : Integer = 0);
+constructor TCellObject.Create( val : Integer = 0; amou : Integer = 0; x : Integer = 0; y : Integer = 0; centerOfGravityX : Double = 0; centerOfGravityY : Double = 0);
+var positions : Double;
 begin
   value := val;
   amount := amou;
   Self.x := x;
   Self.y := y;
+  positions := Random(3) - 1;
+  if positions <> 0 then positions := positions/2;
+  Self.centerOfGravityX := positions;
+  positions := Random(3) - 1;
+  if positions <> 0 then positions := positions/2;
+  Self.centerOfGravityY := positions;
 end;
 
 procedure TfrmMain.FormCreate(Sender: TObject);
@@ -1011,5 +1021,10 @@ var nextGridArray: TGridArray;
       end;
   end;
   gridArray := nextGridArray;
+end;
+
+procedure TRules.withRadius;
+begin
+  //
 end;
 end.
