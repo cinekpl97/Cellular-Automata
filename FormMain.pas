@@ -32,6 +32,7 @@ type
     edtColumnCellAmount: TEdit;
     edtRandomAmount: TEdit;
     cmbHexagonalType: TComboBox;
+    edtLocationRadius: TEdit;
     procedure edtTimeChange(Sender: TObject);
     procedure edtSzerokoscChange(Sender: TObject);
     procedure initGridArray;
@@ -59,6 +60,7 @@ type
     procedure edtRowCellAmountChange(Sender: TObject);
     procedure edtColumnCellAmountChange(Sender: TObject);
     procedure cmbGrainGrowthChange(Sender: TObject);
+
   private
     { Private declarations }
   public
@@ -70,7 +72,8 @@ type
     public
    value: Integer;
    amount: Integer;
-   constructor Create( val : Integer = 0; amou : Integer = 0);
+   x, y : Integer;
+   constructor Create( val : Integer = 0; amou : Integer = 0; x : Integer = 0; y : Integer = 0);
   end;
 
   type
@@ -98,6 +101,12 @@ type
     end;
  var rules: TRules;
 
+ type TCoordinates = class
+   public
+   x, y : Integer;
+   function countIfRadiusFromOtherPointHigher(pPoint : TCoordinates; userChoosenRadius : Integer):Boolean;
+ end;
+
 
 implementation
 
@@ -106,10 +115,12 @@ uses
 
 {$R *.dfm}
 
-constructor TCellObject.Create( val : Integer = 0; amou : Integer = 0);
+constructor TCellObject.Create( val : Integer = 0; amou : Integer = 0; x : Integer = 0; y : Integer = 0);
 begin
   value := val;
   amount := amou;
+  Self.x := x;
+  Self.y := y;
 end;
 
 procedure TfrmMain.FormCreate(Sender: TObject);
@@ -352,7 +363,10 @@ end;
 {Section: OnChange}
 
 procedure TfrmMain.cmbChooseGrainLocationsChange(Sender: TObject);
-var X, Y, I, J, trueOrFalse, counter, xLocationStep, yLocationStep: Integer;
+var X, Y, I, J, trueOrFalse, counter, xLocationStep, yLocationStep, distance: Integer;
+    cellsList : TList<TCellObject>;
+    ifRadiusOK : Boolean;
+    coordinatesNew, coordinatesOld : TCoordinates;
 begin
   counter := 1;
   clearGridArray;
@@ -393,11 +407,52 @@ begin
     end;
   end
   else if cmbChooseGrainLocations.Text = 'z promieniem' then begin
+    edtRowCellAmount.Visible := False;
+    edtColumnCellAmount.Visible := False;
+    edtRandomAmount.Visible := True;
+    edtLocationRadius.Visible := True;
+    counter := 1;
+    cellsList := TList<TCellObject>.Create;
+    ifRadiusOk := True;
+    coordinatesOld := TCoordinates.Create;
+    coordinatesNew := TCoordinates.Create;
+    if (edtRandomAmount.Text <> '0') and (edtLocationRadius.Text <> '0') then begin
+      while counter < StrToInt(edtRandomAmount.Text) do begin
+         for X := 0 to maxWidth - 1 do begin
+          for Y := 0 to maxTime - 1 do begin
+            for I := 0 to cellsList.Count - 1 do begin
+              coordinatesNew.x := X;
+              coordinatesNew.y := Y;
+              coordinatesOld.x := cellsList[I].x;
+              coordinatesOld.y := cellsList[I].y;
+              if coordinatesNew.countIfRadiusFromOtherPointHigher(coordinatesOld, StrToInt(edtLocationRadius.Text)) then begin
+                ifRadiusOk := True;
+              end
+              else begin
+                ifRadiusOk := False;
+                break;
+              end;
+            end;
+
+            if (ifRadiusOk) and (counter <= StrToInt(edtRandomAmount.Text)) then begin
+             gridArray[X][Y].value := counter;
+             gridArray[X][Y].x := X;
+             gridArray[X][Y].y := Y;
+             SetColor;
+             cellsList.Add(gridArray[X][Y]);
+             counter := counter + 1;
+             if counter = StrToInt(edtRandomAmount.Text) then break;
+             ifRadiusOk := False;
+            end;
+          end;
+         end;
+      end;
+
+      
+
+    end;
 
   end;
-
-
-
   drawColourGrid;
 
 end;
@@ -502,7 +557,6 @@ begin
   if edtTime.Text = '' then edtTime.Text := '0';
 end;
 
-
 {Section: Other functions}
 function TfrmMain.setCellPrintSize(): Integer;
 var scaleX, scaleY: Integer;
@@ -587,6 +641,14 @@ begin
         maxValue := dictionaryOfValues[Key];
       end;
     end;
+end;
+
+function TCoordinates.countIfRadiusFromOtherPointHigher(pPoint: TCoordinates; userChoosenRadius : Integer):Boolean;
+begin
+    if Power(Self.x - pPoint.x, 2) + Power(Self.y - pPoint.y, 2) <= Power(userChoosenRadius, 2) then begin
+    Result := False;
+   end
+    else Result := True;
 end;
 
 {

@@ -300,6 +300,16 @@ object frmMain: TfrmMain
         'losowe')
     end
   end
+  object edtLocationRadius: TEdit
+    Left = 969
+    Top = 440
+    Width = 95
+    Height = 21
+    NumbersOnly = True
+    TabOrder = 1
+    Text = '0'
+    Visible = False
+  end
   object TimerRule2D: TTimer
     Enabled = False
     Interval = 500
