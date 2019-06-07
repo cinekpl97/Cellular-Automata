@@ -33,6 +33,9 @@ type
     edtRandomAmount: TEdit;
     cmbHexagonalType: TComboBox;
     edtLocationRadius: TEdit;
+    edtGrainGrowthRadiation: TEdit;
+    btnMonteCarlo: TButton;
+    cmbDrawGridOrEnergy: TComboBox;
     procedure edtTimeChange(Sender: TObject);
     procedure edtSzerokoscChange(Sender: TObject);
     procedure initGridArray;
@@ -60,6 +63,11 @@ type
     procedure edtRowCellAmountChange(Sender: TObject);
     procedure edtColumnCellAmountChange(Sender: TObject);
     procedure cmbGrainGrowthChange(Sender: TObject);
+    procedure btnMonteCarloClick(Sender: TObject);
+    function countCellEnergy(X, Y: Integer): Integer;
+    function getRandomNeighbourValue(X, Y: Integer): Integer;
+    procedure drawEnergy;
+    procedure cmbDrawGridOrEnergyChange(Sender: TObject);
 
   private
     { Private declarations }
@@ -75,6 +83,10 @@ type
    x, y : Integer;
    centerOfGravityX : Double;
    centerOfGravityY : Double;
+   energy: Integer;
+   ifMonteCarloChecked : Boolean;
+   densityOfDislocation: Integer;
+   recrystallization: Boolean;
    constructor Create( val : Integer = 0; amou : Integer = 0; x : Integer = 0; y : Integer = 0; centerOfGravityX : Double = 0; centerOfGravityY : Double = 0);
   end;
 
@@ -97,6 +109,7 @@ type
      procedure pentagonal;
      procedure hexagonal;
      procedure withRadius;
+     procedure monteCarlo;
      function IntToBinLowByte(Value: LongWord): string;
      function modulo(x, m: Integer): Integer;
     private
@@ -125,6 +138,7 @@ begin
   amount := amou;
   Self.x := x;
   Self.y := y;
+  Self.ifMonteCarloChecked := False;
   positions := Random(3) - 1;
   if positions <> 0 then positions := positions/2;
   Self.centerOfGravityX := positions;
@@ -291,6 +305,36 @@ begin
        end;
   end;
 
+procedure TfrmMain.drawEnergy;
+var I, J, startX, startY, cellPrintSize, energyValue: Integer;
+    FColorEnergyList: TList<TColor>;
+begin
+  clearCanvas;
+  cellPrintSize := setCellPrintSize();
+  FColorEnergyList := TList<TColor>.Create;
+  FColorEnergyList.Add(RGB(255, 204, 204));
+  FColorEnergyList.Add(RGB(255, 153, 153));
+  FColorEnergyList.Add(RGB(255, 102, 102));
+  FColorEnergyList.Add(RGB(255, 51, 51));
+  FColorEnergyList.Add(RGB(243, 0, 0));
+  FColorEnergyList.Add(RGB(190, 0, 0));
+  FColorEnergyList.Add(RGB(140, 0, 0));
+  FColorEnergyList.Add(RGB(50, 0, 0));
+
+  startX := 0;
+  startY := 0;
+   for I := 0 to maxWidth - 1 do begin
+      for J := 0 to maxTime - 1 do begin
+       startX := I * cellPrintSize;
+       startY := J * cellPrintSize;
+       boardImage.Canvas.Pen.Color := clBlack;
+//       energyValue := countCellEnergy(I, J);
+       boardImage.Canvas.Brush.Color := FColorEnergyList[gridArray[I][J].energy];
+       boardImage.Canvas.Rectangle(startX, startY,startX + cellPrintSize, startY + cellPrintSize);
+      end;
+   end;
+end;
+
 {Section: OnClicks}
 
 procedure TfrmMain.btnCleanRefreshGridClick(Sender: TObject);
@@ -349,6 +393,12 @@ begin
   drawColourGrid;
 end;
 
+procedure TfrmMain.btnMonteCarloClick(Sender: TObject);
+begin
+  rules.monteCarlo;
+  drawColourGrid;
+end;
+
 procedure TfrmMain.boardImageClick(Sender: TObject);
 var
   pt : tPoint;
@@ -370,6 +420,7 @@ begin
 end;
 
 
+
 {Section: OnChange}
 
 procedure TfrmMain.cmbChooseGrainLocationsChange(Sender: TObject);
@@ -387,6 +438,7 @@ begin
     edtRowCellAmount.Visible := True;
     edtColumnCellAmount.Visible := True;
     edtRandomAmount.Visible := False;
+    edtGrainGrowthRadiation.Visible := False;
     xLocationStep := Trunc(maxWidth/(StrToInt(edtRowCellAmount.Text) + 1));
     yLocationStep := Trunc(maxTime/(StrToInt(edtColumnCellAmount.Text) + 1));
     for I := 1 to StrToInt(edtRowCellAmount.Text) do begin
@@ -402,6 +454,7 @@ begin
     edtRowCellAmount.Visible := False;
     edtColumnCellAmount.Visible := False;
     edtRandomAmount.Visible := True;
+    edtGrainGrowthRadiation.Visible := False;
     counter := 1;
     for X := 0 to maxWidth - 1 do begin
       for Y := 0 to maxTime - 1 do begin
@@ -421,6 +474,7 @@ begin
     edtColumnCellAmount.Visible := False;
     edtRandomAmount.Visible := True;
     edtLocationRadius.Visible := True;
+    edtGrainGrowthRadiation.Visible := False;
     counter := 1;
     cellsList := TList<TCellObject>.Create;
     ifRadiusOk := True;
@@ -487,13 +541,27 @@ begin
 
 end;
 
+procedure TfrmMain.cmbDrawGridOrEnergyChange(Sender: TObject);
+begin
+  if cmbDrawGridOrEnergy.Text = 'siatka' then begin
+    drawColourGrid;
+  end else if cmbDrawGridOrEnergy.Text = 'energia' then begin
+    drawEnergy;
+  end;
+
+
+end;
+
 procedure TfrmMain.cmbGrainGrowthChange(Sender: TObject);
 begin
   if cmbGrainGrowth.Text = 'heksagonalne' then begin
     cmbHexagonalType.Visible := True;
-  end else begin
+    edtGrainGrowthRadiation.Visible := False;
+  end else if cmbGrainGrowth.Text = 'z promieniem' then begin
+    edtGrainGrowthRadiation.Visible := True;
     cmbHexagonalType.Visible := False;
   end;
+
 
 end;
 
@@ -511,6 +579,8 @@ begin
      cmbGrainGrowth.Visible := False;
      cmbChooseGrainLocations.Visible := False;
      btnDrawGrainGrowth.Visible := False;
+
+     btnMonteCarlo.Visible := False;
    end
    else if cmbRuleType.Text = 'Rule2D' then begin
       clearCanvas;
@@ -524,6 +594,8 @@ begin
      cmbGrainGrowth.Visible := False;
      cmbChooseGrainLocations.Visible := False;
      btnDrawGrainGrowth.Visible := False;
+
+     btnMonteCarlo.Visible := False;
    end
    else if cmbRuleType.Text = 'Rozrost Ziaren' then begin
      clearCanvas;
@@ -536,7 +608,20 @@ begin
      cmbGrainGrowth.Visible := True;
      cmbChooseGrainLocations.Visible := True;
      btnDrawGrainGrowth.Visible := True;
+     btnMonteCarlo.Visible := False;
+   end
+   else if cmbRuleType.Text = 'Monte Carlo' then begin
+     lblRegula.Visible := False;
+     edtRuleNo.Visible := False;
+     btnDraw.Visible := False;
+     cmbChooseRule2D.Visible := False;
+     btnDrawRule2D.Visible := False;
+     cmbGrainGrowth.Visible := True;
+     cmbChooseGrainLocations.Visible := True;
+     btnDrawGrainGrowth.Visible := True;
+     btnMonteCarlo.Visible := True;
    end;
+
 
 end;
 
@@ -604,16 +689,11 @@ begin
   end else if cmbGrainGrowth.Text = 'heksagonalne' then begin
     rules.hexagonal;
   end;
-
-
-
-
   drawColourGrid;
 end;
 
 procedure TfrmMain.TimerRule2DTimer(Sender: TObject);
-var x, y: Integer;
-    temp: Boolean;
+var x: Integer;
 begin
   rules.rule2D;
   drawColourGrid;
@@ -626,10 +706,6 @@ var
   maxList: TList<Integer>;
   isValueFound: Boolean;
 begin
-    Result := 1;
-
-    isValueFound := False;
-    maxValue := 0;
 
     dictionaryOfValues := TDictionary<Integer, Integer>.Create;
     for I := 0 to Length(valuesArray) - 1 do begin
@@ -661,6 +737,321 @@ begin
     else Result := True;
 end;
 
+function TfrmMain.countCellEnergy(X: Integer; Y: Integer): Integer;
+var leftCell, rightCell, topCell, bottomCell, I, J, counter, neighboursCounter, xCell, yCell, xFirstCorner, yFirstCorner, xSecondCorner, ySecondCorner: Integer;
+neighbourCellsArray: TArray<Integer>;
+ begin
+  if cmbGrainGrowth.Text = 'von Neumann' then begin
+      counter := 0;
+      neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0);
+      //tutaj dodaæ opcjê absorpcja albo nie
+      if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+        leftCell := X - 1;
+        rightCell := X + 1;
+        topCell := Y - 1;
+        bottomCell := Y + 1;
+        if X - 1 < 0 then leftCell := 0;
+        if X + 1 >= maxWidth then rightCell := maxWidth - 1;
+        if Y + 1 >= maxTime then bottomCell := maxTime - 1;
+        if Y - 1 < 0 then topCell := 0;
+      end
+      else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+        leftCell := rules.modulo(X - 1, maxWidth);
+        rightCell := rules.modulo(X + 1, maxWidth);
+        topCell := rules.modulo(Y + 1, maxTime);
+        bottomCell := rules.modulo(Y - 1, maxTime);
+      end;
+
+     neighbourCellsArray[0] := gridArray[leftCell][rules.modulo(Y, maxTime)].value;
+     neighbourCellsArray[1] := gridArray[rules.modulo(X, maxWidth)][topCell].value;
+     neighbourCellsArray[2] := gridArray[rightCell][rules.modulo(Y, maxTime)].value;
+     neighbourCellsArray[3] := gridArray[rules.modulo(X, maxWidth)][bottomCell].value;
+
+     for I := 0 to Length(neighbourCellsArray) - 1 do begin
+       if neighbourCellsArray[I] <> gridArray[X][Y].value then begin
+         counter := counter + 1;
+       end;
+     end;
+     Result := counter;
+
+
+  end else if cmbGrainGrowth.Text = 'Moore' then begin
+      counter := 0;
+      neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0, 0, 0, 0);
+        for I := -1 to 1 do begin
+          for J := -1 to 1 do begin
+            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+              xCell := rules.modulo(X + I, maxWidth);
+              yCell := rules.modulo(Y + J, maxTime);
+              if X + I <= 0 then xCell := 0;
+              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+              if Y + J > maxTime - 1 then yCell := maxTime - 1;
+              if Y + J < 0 then yCell := 0;
+              if not ((I = 0) and (J = 0)) then begin
+                if gridArray[xCell][yCell].value <> gridArray[X][Y].value then begin
+                  counter := counter + 1;
+                end;
+              end;
+            end
+            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+              if not ((I = 0) and (J = 0)) then begin
+                if gridArray[rules.modulo(X + I, maxWidth)][rules.modulo(Y + J, maxTime)].value <> gridArray[X][Y].value then begin
+                  counter := counter + 1;
+                end;
+              end;
+            end;
+         end;
+        end;
+
+        Result := counter;
+
+  end else if cmbGrainGrowth.Text = 'heksagonalne' then begin
+        counter := 0;
+        neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0, 0);
+
+    if frmMain.cmbHexagonalType.Text = 'lewo' then begin
+      xFirstCorner := -1;
+      yFirstCorner := 1;
+
+      xSecondCorner := 1;
+      ySecondCorner := -1;
+
+    end else if frmMain.cmbHexagonalType.Text = 'prawo' then begin
+      xFirstCorner := -1;
+      yFirstCorner := -1;
+
+      xSecondCorner := 1;
+      ySecondCorner := 1;
+
+    end else if frmMain.cmbHexagonalType.Text = 'losowe' then begin
+      if Random(2) = 0 then begin
+        xFirstCorner := -1;
+        yFirstCorner := 1;
+
+        xSecondCorner := 1;
+        ySecondCorner := -1;
+      end else begin
+        xFirstCorner := -1;
+        yFirstCorner := -1;
+
+        xSecondCorner := 1;
+        ySecondCorner := 1;
+      end;
+
+
+    end;
+
+        neighboursCounter := 0;
+    for I := -1 to 1 do begin
+      for J := -1 to 1 do begin
+        if not (((I = 0) and (J = 0)) or ((I = xFirstCorner) and (J = yFirstCorner))
+          or ((I = xSecondCorner) and (J = ySecondCorner))) then begin
+          if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+          xCell := rules.modulo(X + I, maxWidth);
+          yCell := rules.modulo(Y + J, maxTime);
+          if X + I <= 0 then xCell := 0;
+          if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+          if Y + J > maxTime - 1 then yCell := maxTime - 1;
+          if Y + J < 0 then yCell := 0;
+          if gridArray[xCell][yCell].value <> gridArray[X][Y].value then begin
+           counter := counter + 1;
+          end;
+
+          end else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+            if gridArray[rules.modulo(X + I, maxWidth)][rules.modulo(Y + J, maxTime)].value <> gridArray[X][Y].value then counter := counter + 1;
+          end;
+        end;
+     end;
+
+    end;
+    Result := counter;
+
+  end else if cmbGrainGrowth.Text = 'pentagonalne losowe' then begin
+      counter := 0;
+//      neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0);
+//  //needed to set random which row/column to cut
+//  leftColumn := -1;
+//  rightColumn := 1;
+//  topRow := 1;
+//  bottomRow := -1;
+//  //setting cut values
+//  exceptionRowOrColumnNumber := Random(2);
+//  RowOrColumn := Random(2);
+//  //each if means which row or column to cut, there are four possibilities
+//  if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 0) then begin
+//    bottomRow := 0;
+//  end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 0) then begin
+//    topRow := 0;
+//  end else if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 1) then begin
+//    leftColumn := 0;
+//  end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 1) then begin
+//    rightColumn := 0;
+//  end;
+//
+//  for X := 0 to maxWidth - 1 do begin
+//      for Y := 0 to maxTime - 1 do begin
+//      neighboursCounter := 0;
+//  // I and J are limited not to check neighbours for one column or row
+//        for I := leftColumn to rightColumn do begin
+//          for J := bottomRow to topRow do begin
+//            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+//              xCell := modulo(X + I, maxWidth);
+//              yCell := modulo(Y + J, maxTime);
+//              if X + I <= 0 then xCell := 0;
+//              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+//              if Y + J > maxTime - 1 then yCell := maxTime - 1;
+//              if Y + J < 0 then yCell := 0;
+//              if not ((I = 0) and (J = 0)) then begin
+//
+//                neighbourCellsArray[neighboursCounter] := gridArray[xCell][yCell].value;
+//                neighboursCounter := neighboursCounter + 1;
+//              end;
+//            end
+//            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+//              if not ((I = 0) and (J = 0)) then begin
+//                neighbourCellsArray[neighboursCounter] := gridArray[modulo(X + I, maxWidth)][modulo(Y + J, maxTime)].value;
+//                neighboursCounter := neighboursCounter + 1;
+//              end;
+//            end;
+//         end;
+//        end;
+//
+//        if gridArray[X][Y].value = 0 then begin
+//         nextGridArray[X][Y].value := frmMain.mostFrequentValue(neighbourCellsArray);
+//        end else begin
+//         nextGridArray[X][Y].value := gridArray[X][Y].value;
+//        end;
+//
+//      end;
+//  end;
+  end;
+end;
+
+function TfrmMain.getRandomNeighbourValue(X: Integer; Y: Integer): Integer;
+var leftCell, rightCell, topCell, bottomCell, I, J, counter, neighboursCounter, xCell, yCell, rand, xFirstCorner, yFirstCorner, xSecondCorner, ySecondCorner: Integer;
+neighbourCellsArray: TArray<Integer>;
+begin
+  if cmbGrainGrowth.Text = 'von Neumann' then begin
+      counter := 0;
+      neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0);
+      //tutaj dodaæ opcjê absorpcja albo nie
+      if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+        leftCell := X - 1;
+        rightCell := X + 1;
+        topCell := Y - 1;
+        bottomCell := Y + 1;
+        if X - 1 < 0 then leftCell := 0;
+        if X + 1 >= maxWidth then rightCell := maxWidth - 1;
+        if Y + 1 >= maxTime then bottomCell := maxTime - 1;
+        if Y - 1 < 0 then topCell := 0;
+      end
+      else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+        leftCell := rules.modulo(X - 1, maxWidth);
+        rightCell := rules.modulo(X + 1, maxWidth);
+        topCell := rules.modulo(Y + 1, maxTime);
+        bottomCell := rules.modulo(Y - 1, maxTime);
+      end;
+
+     neighbourCellsArray[0] := gridArray[leftCell][rules.modulo(Y, maxTime)].value;
+     neighbourCellsArray[1] := gridArray[rules.modulo(X, maxWidth)][topCell].value;
+     neighbourCellsArray[2] := gridArray[rightCell][rules.modulo(Y, maxTime)].value;
+     neighbourCellsArray[3] := gridArray[rules.modulo(X, maxWidth)][bottomCell].value;
+     Randomize;
+     rand := Random(4);
+     Result := neighbourCellsArray[rand];
+
+
+  end else if cmbGrainGrowth.Text = 'Moore' then begin
+      counter := 0;
+      neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0, 0, 0, 0);
+        for I := -1 to 1 do begin
+          for J := -1 to 1 do begin
+            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+              xCell := rules.modulo(X + I, maxWidth);
+              yCell := rules.modulo(Y + J, maxTime);
+              if X + I <= 0 then xCell := 0;
+              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+              if Y + J > maxTime - 1 then yCell := maxTime - 1;
+              if Y + J < 0 then yCell := 0;
+              if not ((I = 0) and (J = 0)) then begin
+                neighbourCellsArray[neighboursCounter] := gridArray[xCell][yCell].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end
+            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+              if not ((I = 0) and (J = 0)) then begin
+                neighbourCellsArray[neighboursCounter] := gridArray[rules.modulo(X + I, maxWidth)][rules.modulo(Y + J, maxTime)].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end;
+         end;
+        end;
+        Randomize;
+         rand := Random(8);
+         Result := neighbourCellsArray[rand];
+  end else if cmbGrainGrowth.Text = 'heksagonalne' then begin
+  //hexagonal has only 6 neighbours
+  neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0, 0);
+
+    if frmMain.cmbHexagonalType.Text = 'lewo' then begin
+      xFirstCorner := -1;
+      yFirstCorner := 1;
+
+      xSecondCorner := 1;
+      ySecondCorner := -1;
+
+    end else if frmMain.cmbHexagonalType.Text = 'prawo' then begin
+      xFirstCorner := -1;
+      yFirstCorner := -1;
+
+      xSecondCorner := 1;
+      ySecondCorner := 1;
+
+    end else if frmMain.cmbHexagonalType.Text = 'losowe' then begin
+      if Random(2) = 0 then begin
+        xFirstCorner := -1;
+        yFirstCorner := 1;
+
+        xSecondCorner := 1;
+        ySecondCorner := -1;
+      end else begin
+        xFirstCorner := -1;
+        yFirstCorner := -1;
+
+        xSecondCorner := 1;
+        ySecondCorner := 1;
+      end;
+    end;
+
+    neighboursCounter := 0;
+      for I := -1 to 1 do begin
+        for J := -1 to 1 do begin
+          if not (((I = 0) and (J = 0)) or ((I = xFirstCorner) and (J = yFirstCorner))
+            or ((I = xSecondCorner) and (J = ySecondCorner))) then begin
+            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+            xCell := rules.modulo(X + I, maxWidth);
+            yCell := rules.modulo(Y + J, maxTime);
+            if X + I <= 0 then xCell := 0;
+            if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+            if Y + J > maxTime - 1 then yCell := maxTime - 1;
+            if Y + J < 0 then yCell := 0;
+              neighbourCellsArray[neighboursCounter] := gridArray[xCell][yCell].value;
+              neighboursCounter := neighboursCounter + 1;
+          end
+          else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+              neighbourCellsArray[neighboursCounter] := gridArray[rules.modulo(X + I, maxWidth)][rules.modulo(Y + J, maxTime)].value;
+              neighboursCounter := neighboursCounter + 1;
+          end;
+          end;
+       end;
+      end;
+     Randomize;
+     rand := Random(6);
+     Result := neighbourCellsArray[rand];
+  end else if cmbGrainGrowth.Text = 'pentagonalne losowe' then begin
+
+  end;
+end;
 {
 TRules
 }
@@ -766,7 +1157,7 @@ end;
 
 procedure TRules.ruleVonNeumann;
 var nextGridArray: TGridArray;
-  X, Y, I, J, max, leftCell, rightCell, topCell, BottomCell: Integer;
+  X, Y, I, J, leftCell, rightCell, topCell, BottomCell: Integer;
   neighbourCellsArray: TArray<Integer>;
  begin
   SetLength(nextGridArray, maxWidth, maxTime);
@@ -817,7 +1208,7 @@ end;
 
 procedure TRules.Moore;
 var nextGridArray: TGridArray;
-  X, Y, I, J, max, neighboursCounter, xCell, yCell: Integer;
+  X, Y, I, J, neighboursCounter, xCell, yCell: Integer;
   neighbourCellsArray: TArray<Integer>;
  begin
   SetLength(nextGridArray, maxWidth, maxTime);
@@ -942,8 +1333,8 @@ end;
 
 procedure TRules.hexagonal;
 var nextGridArray: TGridArray;
-  X, Y, I, J, neighboursCounter, xCell, yCell, exceptionRowOrColumnNumber,
-   RowOrColumn, xFirstCorner, yFirstCorner, xSecondCorner, ySecondCorner: Integer;
+  X, Y, I, J, neighboursCounter, xCell, yCell,
+   xFirstCorner, yFirstCorner, xSecondCorner, ySecondCorner: Integer;
   neighbourCellsArray: TArray<Integer>;
  begin
  //function mostly copied from pentagonal neighbourhood, changed to corner options
@@ -1024,7 +1415,126 @@ var nextGridArray: TGridArray;
 end;
 
 procedure TRules.withRadius;
+var nextGridArray: TGridArray;
+  X, Y, I, J, neighboursCounter, xCell, yCell, exceptionRowOrColumnNumber,
+   RowOrColumn, leftColumn, rightColumn, topRow, bottomRow: Integer;
+  neighbourCellsArray: TArray<Integer>;
+ begin
+ //creating Cells array for new iteration
+  SetLength(nextGridArray, maxWidth, maxTime);
+  for I := 0 to maxTime - 1 do begin
+    for J := 0 to maxWidth - 1 do begin
+      nextGridArray[J][I] := TCellObject.Create;
+    end;
+  end;
+  //the amount of neighbour cells need to be counted every time by the radius
+  neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0);
+
+  for X := 0 to maxWidth - 1 do begin
+      for Y := 0 to maxTime - 1 do begin
+      neighboursCounter := 0;
+  // I and J are limited not to check neighbours for one column or row
+        for I := leftColumn to rightColumn do begin
+          for J := bottomRow to topRow do begin
+            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+              xCell := modulo(X + I, maxWidth);
+              yCell := modulo(Y + J, maxTime);
+              if X + I <= 0 then xCell := 0;
+              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+              if Y + J > maxTime - 1 then yCell := maxTime - 1;
+              if Y + J < 0 then yCell := 0;
+              if not ((I = 0) and (J = 0)) then begin
+
+                neighbourCellsArray[neighboursCounter] := gridArray[xCell][yCell].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end
+            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+              if not ((I = 0) and (J = 0)) then begin
+                neighbourCellsArray[neighboursCounter] := gridArray[modulo(X + I, maxWidth)][modulo(Y + J, maxTime)].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end;
+         end;
+        end;
+
+        if gridArray[X][Y].value = 0 then begin
+         nextGridArray[X][Y].value := frmMain.mostFrequentValue(neighbourCellsArray);
+        end else begin
+         nextGridArray[X][Y].value := gridArray[X][Y].value;
+        end;
+
+      end;
+  end;
+  gridArray := nextGridArray;
+end;
+
+procedure TRules.monteCarlo;
+  var X, Y, I, J, counter, randomX, randomY, energyBefore, energyAfter, randomNeighbourValue, delta: Integer;
+      probability, randomForProbability, kt: Double;
+      nextGridArray: TGridArray;
+      checkIfEmpty: Boolean;
 begin
-  //
+  Randomize;
+  checkIfEmpty := False;
+ //creating Cells array for new iteration
+  SetLength(nextGridArray, maxWidth, maxTime);
+  for I := 0 to maxTime - 1 do begin
+    for J := 0 to maxWidth - 1 do begin
+      nextGridArray[J][I] := TCellObject.Create;
+    end;
+  end;
+
+  //checking if array doesnt have any empty cells
+  for X := 0 to maxWidth - 1 do begin
+   for Y := 0 to maxTime - 1 do begin
+     if gridArray[X][Y].value = 0 then begin
+       checkIfEmpty := True;
+     end;
+   end;
+  end;
+  if checkIfEmpty = True then ShowMessage('the grid is not filled');
+
+  //setting Cells to begin Monte Carlo, no cell was checked
+  for X := 0 to maxWidth - 1 do begin
+    for Y := 0 to maxTime - 1 do begin
+      gridArray[X][Y].ifMonteCarloChecked := False;
+    end;
+  end;
+
+  counter := 0;
+  //needs to work till every cell is checked
+  while counter < maxWidth * maxTime do begin
+    randomX := Random(maxWidth);
+    randomY := Random(maxTime);
+
+    if not gridArray[randomX][randomY].ifMonteCarloChecked then begin
+      gridArray[randomX][randomY].ifMonteCarloChecked := True;
+      energyBefore := 0;
+      energyAfter := 0;
+
+      energyBefore := frmMain.countCellEnergy(randomX, randomY);
+      randomNeighbourValue := frmMain.getRandomNeighbourValue(randomX, randomY);
+      energyAfter := frmMain.countCellEnergy(randomX, randomY);
+
+      delta := energyAfter - energyBefore;
+      if delta <= 0 then begin
+        gridArray[randomX][randomY].value := randomNeighbourValue;
+        gridArray[randomX][randomY].energy := energyBefore;
+      end else begin
+        kt := 0.9;
+        probability := Exp(-(delta/kt));
+        randomForProbability := Random;
+        if randomForProbability <= probability then begin
+          gridArray[randomX][randomY].value := randomNeighbourValue;
+          gridArray[randomX][randomY].energy := energyAfter;
+        end;
+      end;
+      counter := counter + 1;
+    end;
+
+  end;
+
+
 end;
 end.

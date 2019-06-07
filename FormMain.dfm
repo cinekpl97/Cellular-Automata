@@ -156,7 +156,8 @@ object frmMain: TfrmMain
       Items.Strings = (
         'Rule1D'
         'Rule2D'
-        'Rozrost Ziaren')
+        'Rozrost Ziaren'
+        'Monte Carlo')
     end
     object cmbChooseRule2D: TComboBox
       Left = 30
@@ -231,7 +232,7 @@ object frmMain: TfrmMain
     end
     object btnDrawGrainGrowth: TButton
       Left = 48
-      Top = 170
+      Top = 171
       Width = 81
       Height = 23
       Caption = 'Rysuj'
@@ -298,6 +299,40 @@ object frmMain: TfrmMain
         'lewo'
         'prawo'
         'losowe')
+    end
+    object edtGrainGrowthRadiation: TEdit
+      Left = 72
+      Top = 480
+      Width = 95
+      Height = 21
+      NumbersOnly = True
+      TabOrder = 16
+      Text = '0'
+      Visible = False
+    end
+    object btnMonteCarlo: TButton
+      Left = 48
+      Top = 520
+      Width = 81
+      Height = 23
+      Caption = 'Monte Carlo'
+      TabOrder = 17
+      Visible = False
+      OnClick = btnMonteCarloClick
+    end
+    object cmbDrawGridOrEnergy: TComboBox
+      Left = 32
+      Top = 549
+      Width = 121
+      Height = 21
+      Style = csDropDownList
+      ItemIndex = 0
+      TabOrder = 18
+      Text = 'siatka'
+      OnChange = cmbDrawGridOrEnergyChange
+      Items.Strings = (
+        'siatka'
+        'energia')
     end
   end
   object edtLocationRadius: TEdit
