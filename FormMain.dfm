@@ -332,7 +332,17 @@ object frmMain: TfrmMain
       OnChange = cmbDrawGridOrEnergyChange
       Items.Strings = (
         'siatka'
-        'energia')
+        'energia'
+        'DRX')
+    end
+    object btnDRX: TButton
+      Left = 48
+      Top = 608
+      Width = 75
+      Height = 25
+      Caption = 'DRX'
+      TabOrder = 19
+      OnClick = btnDRXClick
     end
   end
   object edtLocationRadius: TEdit

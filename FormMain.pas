@@ -36,6 +36,7 @@ type
     edtGrainGrowthRadiation: TEdit;
     btnMonteCarlo: TButton;
     cmbDrawGridOrEnergy: TComboBox;
+    btnDRX: TButton;
     procedure edtTimeChange(Sender: TObject);
     procedure edtSzerokoscChange(Sender: TObject);
     procedure initGridArray;
@@ -46,6 +47,7 @@ type
     procedure drawColourGrid;
     procedure clearCanvas;
     procedure clearGridArray;
+    procedure clearPreviousGridArray;
     procedure setCellValue(x, y: Integer);
     function setCellPrintSize(): Integer;
     procedure boardImageClick(Sender: TObject);
@@ -64,15 +66,23 @@ type
     procedure edtColumnCellAmountChange(Sender: TObject);
     procedure cmbGrainGrowthChange(Sender: TObject);
     procedure btnMonteCarloClick(Sender: TObject);
-    function countCellEnergy(X, Y: Integer): Integer;
+    function countCellEnergy(X, Y, newCellValue: Integer): Integer;
     function getRandomNeighbourValue(X, Y: Integer): Integer;
     procedure drawEnergy;
     procedure cmbDrawGridOrEnergyChange(Sender: TObject);
+    procedure SaveToFile(text : String);
+    procedure UpdatePreviousIteration;
+    procedure btnDRXClick(Sender: TObject);
+    procedure drawDRX;
+    procedure drawRecrystilized;
+    procedure SetMinusColor;
+
 
   private
     { Private declarations }
   public
-    { Public declarations }
+    var
+    {}
   end;
 
   type
@@ -85,7 +95,7 @@ type
    centerOfGravityY : Double;
    energy: Integer;
    ifMonteCarloChecked : Boolean;
-   densityOfDislocation: Integer;
+   densityOfDislocation: Extended;
    recrystallization: Boolean;
    constructor Create( val : Integer = 0; amou : Integer = 0; x : Integer = 0; y : Integer = 0; centerOfGravityX : Double = 0; centerOfGravityY : Double = 0);
   end;
@@ -95,12 +105,19 @@ type
 var
   frmMain: TfrmMain;
   gridArray: TGridArray;
+  previousGridArray: TGridArray;
   maxWidth, maxTime:Integer;
   bitMap: TBitmap;
   FColorList : TList<TColor>;
+  FMinusColorList : TList<TColor>;
 type
     TRules = class
     public
+    deltaRo : Extended;
+    criticalDensity : Extended;
+    tmpRo : Extended;
+    roDifference : Extended;
+    minusValue : Integer;
      procedure ActivateChoosen1DRules(x, y: Integer);
      procedure rule1D(x, y, leftCellValue, middleCellValue, rightCellValue, trueOrFalse: Integer);
      procedure rule2D;
@@ -110,8 +127,12 @@ type
      procedure hexagonal;
      procedure withRadius;
      procedure monteCarlo;
+     function recrystalization(A, B, deltaTime, maxTimeStep, percent : Extended) : Extended;
      function IntToBinLowByte(Value: LongWord): string;
      function modulo(x, m: Integer): Integer;
+     procedure setDensity;
+     procedure checkDensityForRecrystalization(criticalDensity : Extended);
+     constructor Create;
     private
      {}
     end;
@@ -147,19 +168,30 @@ begin
   Self.centerOfGravityY := positions;
 end;
 
+constructor TRules.Create;
+begin
+  deltaRo := 0;
+  criticalDensity := 46842668.248;
+  tmpRo := 0;
+  roDifference := 0;
+  minusValue := 0;
+end;
 procedure TfrmMain.FormCreate(Sender: TObject);
 var cellPrintSize: Integer;
 begin
   clearCanvas;
   edtSzerokosc.Text := '20';
   edtTime.Text := '10';
-
   boardImage.Canvas.Pen.Width := 1;
 
   boardImage.Canvas.Pen.Color := clBlack;
   FColorList := TList<TColor>.Create;
+  FMinusColorList := TList<TColor>.Create;
+  FMinusColorList.Add(clWhite);
   FColorList.Add(clWhite);
   FColorList.Add(clBlack);
+  rules := TRules.Create;
+
 end;
 
 
@@ -198,6 +230,22 @@ begin
       for I := 0 to maxTime - 1 do begin
         for J := 0 to maxWidth - 1 do begin
           gridArray[J][I].value := 0;
+        end;
+      end;
+end;
+
+procedure TfrmMain.clearPreviousGridArray;
+var I, J: Integer;
+begin
+      for I := 0 to maxTime - 1 do begin
+        for J := 0 to maxWidth - 1 do begin
+          previousGridArray[J][I] := TCellObject.Create;
+        end;
+      end;
+
+      for I := 0 to maxTime - 1 do begin
+        for J := 0 to maxWidth - 1 do begin
+          previousGridArray[J][I].value := 0;
         end;
       end;
 end;
@@ -286,6 +334,28 @@ begin
   FColorList.Add(randomColor);
 end;
 
+procedure TfrmMain.SetMinusColor;
+  var
+  randomColor : TColor;
+  I: Integer;
+  isNew : Boolean;
+begin
+  Randomize;
+  randomColor := RGB(Random(255), Random(255), Random(255));
+  isNew := False;
+
+  while not isNew do begin
+    for I := 0 to FMinusColorList.Count - 1 do begin
+      if randomColor = FMinusColorList[I] then begin
+        randomColor := RGB(Random(255), Random(255), Random(255));
+        break;
+      end;
+    end;
+    isNew := True;
+  end;
+  FMinusColorList.Add(randomColor);
+end;
+
 procedure TfrmMain.drawColourGrid;
 var I, J, startX, startY, cellPrintSize: Integer;
 begin
@@ -320,7 +390,7 @@ begin
   FColorEnergyList.Add(RGB(190, 0, 0));
   FColorEnergyList.Add(RGB(140, 0, 0));
   FColorEnergyList.Add(RGB(50, 0, 0));
-
+  FColorEnergyList.Add(RGB(0, 0, 0));
   startX := 0;
   startY := 0;
    for I := 0 to maxWidth - 1 do begin
@@ -330,6 +400,60 @@ begin
        boardImage.Canvas.Pen.Color := clBlack;
 //       energyValue := countCellEnergy(I, J);
        boardImage.Canvas.Brush.Color := FColorEnergyList[gridArray[I][J].energy];
+       boardImage.Canvas.Rectangle(startX, startY,startX + cellPrintSize, startY + cellPrintSize);
+      end;
+   end;
+end;
+
+procedure TfrmMain.drawDRX;
+var I, J, startX, startY, cellPrintSize, energyValue: Integer;
+    FColorEnergyList: TList<TColor>;
+    tmpValue: Integer;
+begin
+  tmpValue := 0;
+  clearCanvas;
+  cellPrintSize := setCellPrintSize();
+  startX := 0;
+  startY := 0;
+   for I := 0 to maxWidth - 1 do begin
+      for J := 0 to maxTime - 1 do begin
+       startX := I * cellPrintSize;
+       startY := J * cellPrintSize;
+       boardImage.Canvas.Pen.Color := clBlack;
+       if gridArray[I][J].value < 0 then begin
+         tmpValue := gridArray[I][J].value;
+         tmpValue := abs(tmpValue);
+         boardImage.Canvas.Brush.Color := FMinusColorList[tmpValue];
+       end else begin
+        boardImage.Canvas.Brush.Color := FColorList[gridArray[I][J].value];
+       end;
+
+
+       boardImage.Canvas.Rectangle(startX, startY,startX + cellPrintSize, startY + cellPrintSize);
+      end;
+   end;
+end;
+
+procedure TfrmMain.drawRecrystilized;
+var I, J, startX, startY, cellPrintSize, energyValue: Integer;
+    FColorEnergyList: TList<TColor>;
+begin
+  clearCanvas;
+  cellPrintSize := setCellPrintSize();
+  startX := 0;
+  startY := 0;
+   for I := 0 to maxWidth - 1 do begin
+      for J := 0 to maxTime - 1 do begin
+       startX := I * cellPrintSize;
+       startY := J * cellPrintSize;
+       boardImage.Canvas.Pen.Color := clBlack;
+       if gridArray[I][J].recrystallization = true then begin
+         boardImage.Canvas.Brush.Color := clGreen;
+       end else begin
+        boardImage.Canvas.Brush.Color := clWhite;
+       end;
+
+
        boardImage.Canvas.Rectangle(startX, startY,startX + cellPrintSize, startY + cellPrintSize);
       end;
    end;
@@ -391,6 +515,19 @@ begin
   end;
 
   drawColourGrid;
+end;
+
+procedure TfrmMain.btnDRXClick(Sender: TObject);
+var I: Integer;
+    A, B, deltaTime, maxTime, percent: Extended;
+begin
+    A := 86710969050178.5;
+    B := 9.41268203527779;
+    deltaTime := 0.001;
+    maxTime := 0.2;
+    percent := 0.2;
+    rules.recrystalization(A , B, deltaTime, maxTime, percent);
+  drawDRX;
 end;
 
 procedure TfrmMain.btnMonteCarloClick(Sender: TObject);
@@ -544,10 +681,13 @@ end;
 procedure TfrmMain.cmbDrawGridOrEnergyChange(Sender: TObject);
 begin
   if cmbDrawGridOrEnergy.Text = 'siatka' then begin
-    drawColourGrid;
+    drawDRX;
   end else if cmbDrawGridOrEnergy.Text = 'energia' then begin
     drawEnergy;
+  end else if cmbDrawGridOrEnergy.Text = 'DRX' then begin
+    drawRecrystilized;
   end;
+
 
 
 end;
@@ -737,10 +877,16 @@ begin
     else Result := True;
 end;
 
-function TfrmMain.countCellEnergy(X: Integer; Y: Integer): Integer;
-var leftCell, rightCell, topCell, bottomCell, I, J, counter, neighboursCounter, xCell, yCell, xFirstCorner, yFirstCorner, xSecondCorner, ySecondCorner: Integer;
+function TfrmMain.countCellEnergy(X, Y, newCellValue: Integer): Integer;
+var leftCell, rightCell, topCell, bottomCell, I, J, counter, neighboursCounter, xCell, yCell, xFirstCorner, yFirstCorner, xSecondCorner,
+ ySecondCorner, leftColumn, rightColumn, topRow, bottomRow, RowOrColumn, exceptionRowOrColumnNumber, tempOldCellValue: Integer;
 neighbourCellsArray: TArray<Integer>;
  begin
+    tempOldCellValue := gridArray[X][Y].value;
+   if newCellValue <> 0 then begin
+    gridArray[X][Y].value := newCellValue;
+   end;
+
   if cmbGrainGrowth.Text = 'von Neumann' then begin
       counter := 0;
       neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0);
@@ -868,67 +1014,62 @@ neighbourCellsArray: TArray<Integer>;
 
   end else if cmbGrainGrowth.Text = 'pentagonalne losowe' then begin
       counter := 0;
-//      neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0);
-//  //needed to set random which row/column to cut
-//  leftColumn := -1;
-//  rightColumn := 1;
-//  topRow := 1;
-//  bottomRow := -1;
-//  //setting cut values
-//  exceptionRowOrColumnNumber := Random(2);
-//  RowOrColumn := Random(2);
-//  //each if means which row or column to cut, there are four possibilities
-//  if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 0) then begin
-//    bottomRow := 0;
-//  end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 0) then begin
-//    topRow := 0;
-//  end else if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 1) then begin
-//    leftColumn := 0;
-//  end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 1) then begin
-//    rightColumn := 0;
-//  end;
-//
-//  for X := 0 to maxWidth - 1 do begin
-//      for Y := 0 to maxTime - 1 do begin
-//      neighboursCounter := 0;
-//  // I and J are limited not to check neighbours for one column or row
-//        for I := leftColumn to rightColumn do begin
-//          for J := bottomRow to topRow do begin
-//            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
-//              xCell := modulo(X + I, maxWidth);
-//              yCell := modulo(Y + J, maxTime);
-//              if X + I <= 0 then xCell := 0;
-//              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
-//              if Y + J > maxTime - 1 then yCell := maxTime - 1;
-//              if Y + J < 0 then yCell := 0;
-//              if not ((I = 0) and (J = 0)) then begin
-//
-//                neighbourCellsArray[neighboursCounter] := gridArray[xCell][yCell].value;
-//                neighboursCounter := neighboursCounter + 1;
-//              end;
-//            end
-//            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
-//              if not ((I = 0) and (J = 0)) then begin
-//                neighbourCellsArray[neighboursCounter] := gridArray[modulo(X + I, maxWidth)][modulo(Y + J, maxTime)].value;
-//                neighboursCounter := neighboursCounter + 1;
-//              end;
-//            end;
-//         end;
-//        end;
-//
-//        if gridArray[X][Y].value = 0 then begin
-//         nextGridArray[X][Y].value := frmMain.mostFrequentValue(neighbourCellsArray);
-//        end else begin
-//         nextGridArray[X][Y].value := gridArray[X][Y].value;
-//        end;
-//
-//      end;
-//  end;
+      neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0);
+    //needed to set random which row/column to cut
+    leftColumn := -1;
+    rightColumn := 1;
+    topRow := 1;
+    bottomRow := -1;
+    //setting cut values
+    exceptionRowOrColumnNumber := Random(2);
+    RowOrColumn := Random(2);
+    //each if means which row or column to cut, there are four possibilities
+    if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 0) then begin
+      bottomRow := 0;
+    end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 0) then begin
+      topRow := 0;
+    end else if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 1) then begin
+      leftColumn := 0;
+    end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 1) then begin
+      rightColumn := 0;
+    end;
+
+
+      neighboursCounter := 0;
+  // I and J are limited not to check neighbours for one column or row
+        for I := leftColumn to rightColumn do begin
+          for J := bottomRow to topRow do begin
+            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+              xCell := rules.modulo(X + I, maxWidth);
+              yCell := rules.modulo(Y + J, maxTime);
+              if X + I <= 0 then xCell := 0;
+              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+              if Y + J > maxTime - 1 then yCell := maxTime - 1;
+              if Y + J < 0 then yCell := 0;
+              if not ((I = 0) and (J = 0)) then begin
+
+                if gridArray[xCell][yCell].value <> gridArray[X][Y].value then counter := counter + 1;
+
+              end;
+            end
+            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+              if not ((I = 0) and (J = 0)) then begin
+                if gridArray[rules.modulo(X + I, maxWidth)][rules.modulo(Y + J, maxTime)].value <> gridArray[X][Y].value then counter := counter + 1;
+
+              end;
+            end;
+         end;
+        end;
+
+        Result := counter;
+        gridArray[X][Y].value := tempOldCellValue;
   end;
 end;
 
 function TfrmMain.getRandomNeighbourValue(X: Integer; Y: Integer): Integer;
-var leftCell, rightCell, topCell, bottomCell, I, J, counter, neighboursCounter, xCell, yCell, rand, xFirstCorner, yFirstCorner, xSecondCorner, ySecondCorner: Integer;
+var leftCell, rightCell, topCell, bottomCell, I, J, counter, neighboursCounter, xCell, yCell,
+ rand, xFirstCorner, yFirstCorner, xSecondCorner, ySecondCorner, leftColumn, rightColumn, topRow, bottomRow
+ ,exceptionRowOrColumnNumber, RowOrColumn: Integer;
 neighbourCellsArray: TArray<Integer>;
 begin
   if cmbGrainGrowth.Text = 'von Neumann' then begin
@@ -1049,7 +1190,55 @@ begin
      rand := Random(6);
      Result := neighbourCellsArray[rand];
   end else if cmbGrainGrowth.Text = 'pentagonalne losowe' then begin
+    neighbourCellsArray := TArray<Integer>.Create(0, 0, 0, 0, 0);
+    //needed to set random which row/column to cut
+    leftColumn := -1;
+    rightColumn := 1;
+    topRow := 1;
+    bottomRow := -1;
+    //setting cut values
+    exceptionRowOrColumnNumber := Random(2);
+    RowOrColumn := Random(2);
+    //each if means which row or column to cut, there are four possibilities
+    if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 0) then begin
+      bottomRow := 0;
+    end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 0) then begin
+      topRow := 0;
+    end else if (exceptionRowOrColumnNumber = 0) and (RowOrColumn = 1) then begin
+      leftColumn := 0;
+    end else if (exceptionRowOrColumnNumber = 1) and (RowOrColumn = 1) then begin
+      rightColumn := 0;
+    end;
 
+
+      neighboursCounter := 0;
+  // I and J are limited not to check neighbours for one column or row
+        for I := leftColumn to rightColumn do begin
+          for J := bottomRow to topRow do begin
+            if frmMain.cmbBoundaryConditions.Text = 'absorpcyjne' then begin
+              xCell := rules.modulo(X + I, maxWidth);
+              yCell := rules.modulo(Y + J, maxTime);
+              if X + I <= 0 then xCell := 0;
+              if X + I > maxWidth - 1 then xCell := maxWidth - 1;
+              if Y + J > maxTime - 1 then yCell := maxTime - 1;
+              if Y + J < 0 then yCell := 0;
+              if not ((I = 0) and (J = 0)) then begin
+
+                neighbourCellsArray[neighboursCounter] := gridArray[xCell][yCell].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end
+            else if frmMain.cmbBoundaryConditions.Text = 'periodyczne' then begin
+              if not ((I = 0) and (J = 0)) then begin
+                neighbourCellsArray[neighboursCounter] := gridArray[rules.modulo(X + I, maxWidth)][rules.modulo(Y + J, maxTime)].value;
+                neighboursCounter := neighboursCounter + 1;
+              end;
+            end;
+         end;
+        end;
+        Randomize;
+        rand := Random(5);
+        Result := neighbourCellsArray[rand];
   end;
 end;
 {
@@ -1510,19 +1699,17 @@ begin
 
     if not gridArray[randomX][randomY].ifMonteCarloChecked then begin
       gridArray[randomX][randomY].ifMonteCarloChecked := True;
-      energyBefore := 0;
-      energyAfter := 0;
 
-      energyBefore := frmMain.countCellEnergy(randomX, randomY);
+      energyBefore := frmMain.countCellEnergy(randomX, randomY, 0);
       randomNeighbourValue := frmMain.getRandomNeighbourValue(randomX, randomY);
-      energyAfter := frmMain.countCellEnergy(randomX, randomY);
+      energyAfter := frmMain.countCellEnergy(randomX, randomY, randomNeighbourValue);
 
       delta := energyAfter - energyBefore;
       if delta <= 0 then begin
         gridArray[randomX][randomY].value := randomNeighbourValue;
         gridArray[randomX][randomY].energy := energyBefore;
       end else begin
-        kt := 0.9;
+        kt := 0.1;
         probability := Exp(-(delta/kt));
         randomForProbability := Random;
         if randomForProbability <= probability then begin
@@ -1532,9 +1719,115 @@ begin
       end;
       counter := counter + 1;
     end;
+  end;
+end;
+
+procedure TRules.checkDensityForRecrystalization(criticalDensity : Extended);
+var
+  I, J, tmpEnergy: Integer;
+begin
+  for I := 0 to maxWidth - 1 do begin
+    for J := 0 to maxTime - 1 do begin
+    tmpEnergy := frmMain.countCellEnergy(I,J, 0);
+      if (gridArray[I][J].densityOfDislocation >= criticalDensity) and (tmpEnergy <> 0) then begin
+        minusValue := minusValue - 1;
+        gridArray[I][J].densityOfDislocation := 0;
+        gridArray[I][J].recrystallization := true;
+        gridArray[I][J].value := minusValue;
+        frmMain.SetMinusColor;
+      end;
+    end;
+  end;
+end;
+
+function TRules.recrystalization(A, B, deltaTime, maxTimeStep, percent : Extended) : Extended;
+var
+  ro, time : Extended;
+    I, J, randI, randJ, chance : Integer;
+begin
+    Result := 0;
+    time := 0;
+    criticalDensity := 46842668.248;
+    while time <= maxTimeStep do begin
+      ro := A/B + (1-(A/B))*exp((-1) * B *time);
+      frmMain.SaveToFile(FloatToStr(ro));
+      roDifference := ro - tmpRo;
+      deltaRo := (roDifference/(maxWidth * maxTime)) * percent;
+      for I := 0 to maxWidth - 1 do begin
+        for J := 0 to maxTime - 1 do begin
+          gridArray[I][J].densityOfDislocation := deltaRo;
+          roDifference := roDifference - deltaRo;
+        end;
+      end;
+    setDensity;
+    time := time + deltaTime;
+    tmpRo := ro;
+
+    end;
+    checkDensityForRecrystalization(criticalDensity);
+
+end;
+
+procedure TfrmMain.SaveToFile(text : String);
+var MyText : TStringList;
+begin
+  MyText:= TStringlist.create;
+  try
+    MyText.LoadFromFile('D:\PROGRAMOWANIE\Delphi programy\Automaty1D\filename.txt');
+    MyText.Add(text);
+    MyText.SaveToFile('D:\PROGRAMOWANIE\Delphi programy\Automaty1D\filename.txt');
+  finally
+    MyText.Free
+  end; {try}
+end;
+
+procedure TfrmMain.UpdatePreviousIteration;
+var
+  I: Integer;
+  J: Integer;
+begin
+  SetLength(previousGridArray, maxWidth, maxTime);
+  frmMain.clearPreviousGridArray;
+  for I := 0 to maxWidth - 1 do begin
+    for J := 0 to maxTime - 1 do begin
+      previousGridArray[I][J].value := gridArray[I][J].value;
+      previousGridArray[I][J].amount := gridArray[I][J].amount;
+      previousGridArray[I][J].x := gridArray[I][J].x;
+      previousGridArray[I][J].y := gridArray[I][J].y;
+      previousGridArray[I][J].energy := gridArray[I][J].energy;
+      previousGridArray[I][J].ifMonteCarloChecked := gridArray[I][J].ifMonteCarloChecked;
+      previousGridArray[I][J].densityOfDislocation := gridArray[I][J].densityOfDislocation;
+      previousGridArray[I][J].recrystallization := gridArray[I][J].recrystallization;
+    end;
+  end;
+end;
+
+procedure TRules.setDensity;
+var randI, randJ: Integer;
+    probability, randomPackage : Extended;
+begin
+  while roDifference > 0 do begin
+    randI := Random(maxWidth);
+    randJ := Random(maxTime);
+    if gridArray[randI][randJ].energy = 0 then begin
+      probability := Random;
+      randomPackage := Random * roDifference;
+      if (randomPackage <= roDifference) and (probability <= 0.2) then begin
+        gridArray[randI][randJ].densityOfDislocation := gridArray[randI][randJ].densityOfDislocation + randomPackage;
+        roDifference := roDifference - randomPackage;
+      end;
+      if roDifference < 0.0001 then roDifference := 0;
+    end else begin
+      probability := Random;
+      randomPackage := Random * roDifference;
+      if (randomPackage <= roDifference) and (probability > 0.2) then begin
+        gridArray[randI][randJ].densityOfDislocation := gridArray[randI][randJ].densityOfDislocation + randomPackage;
+        roDifference := roDifference - randomPackage;
+      end;
+      if roDifference < 0.0001 then roDifference := 0;
+    end;
 
   end;
-
 
 end;
 end.
